@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+build/
+
+# Environments and secrets
+.venv/
+.env
+.env.*
+!.env.example
+*.pem
+credentials.json
+
+# Local experiment artifacts.
+# Traces can contain prompts, tool observations, and provider usage.
+runs/
+traces/
+*.jsonl
+
+# Day 3 dashboard local state. The app itself is not implemented yet.
+.streamlit/
+
+# OS and editor
+.DS_Store
+Thumbs.db
+*.swp
