@@ -1,2 +1,4 @@
-def main() -> None:
-    print("Hello from parallax!")
+"""PARALLAX package.
+
+The stdio MCP server entry point is ``python -m parallax.server``.
+"""
