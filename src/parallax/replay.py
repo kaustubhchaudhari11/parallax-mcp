@@ -32,7 +32,9 @@ from parallax.agent import (
     AgentState,
     ChatMessage,
     FactualResolver,
+    LoopBudget,
     ModelAdapter,
+    ModelCompletion,
     ResolvedObservation,
     ToolRequest,
     build_initial_state,
@@ -271,6 +273,60 @@ def restore(
     )
 
 
+def _carry_same_turn_results(branch: AgentState, baseline: AgentState, checkpoint: Checkpoint) -> None:
+    """Copy factual sibling outputs from the pre-fork assistant turn.
+
+    The intervention result is already on ``branch``. Other function calls
+    from that same assistant message stay factual on both arms so a
+    provider continuation can answer every call id. The checkpoint itself
+    is not modified.
+    """
+
+    start = _checkpoint_assistant_index(baseline.messages, checkpoint)
+    if start is None:
+        return
+    present = {
+        (message.tool_name, message.call_id)
+        for message in branch.messages
+        if message.role == "tool"
+    }
+    for message in baseline.messages[start + 1 :]:
+        if message.role == "assistant":
+            break
+        if message.role != "tool":
+            continue
+        identity = (message.tool_name, message.call_id)
+        if identity == (checkpoint.tool_name, checkpoint.call_id) or identity in present:
+            continue
+        branch.messages.append(message.model_copy())
+        record = _tool_record(baseline, message)
+        if record is not None:
+            branch.tool_calls.append(record)
+        branch.tool_calls_used += 1
+        present.add(identity)
+
+
+def _checkpoint_assistant_index(messages: Sequence[ChatMessage], checkpoint: Checkpoint) -> int | None:
+    target = checkpoint.state.messages[-1]
+    if target.role != "assistant":
+        return None
+    for index, message in enumerate(messages):
+        if message.role != "assistant":
+            continue
+        if target.response_id and message.response_id == target.response_id:
+            return index
+        if message.tool_calls == target.tool_calls and message.content == target.content:
+            return index
+    return None
+
+
+def _tool_record(baseline: AgentState, message: ChatMessage) -> ToolCallRecord | None:
+    for record in baseline.tool_calls:
+        if record.name == message.tool_name and record.model_visible_observation == message.content:
+            return record.model_copy()
+    return None
+
+
 def fixture_hash(fixture: IncidentFixture) -> str:
     """Hash the three tool objects and the incident id."""
 
@@ -305,17 +361,23 @@ async def run_pair(
     repeat_index: int,
     trace_path: Path | None = None,
     tool_call_budget: int | None = None,
+    model_call_limit: int | None = None,
 ) -> PairRun:
     """Run one factual baseline and, when the branch is legal, both arms.
 
     Each call creates its own baseline. A shared-checkpoint scheduler is
-    Milestone 2B and is not implemented here. ``phase="harness"`` marks a
-    scripted control-flow trace. ``model_id="fake"`` must use that phase.
-    Those rows are not evaluation trials.
+    not implemented here. ``phase="harness"`` marks a control-flow trace.
+    ``model_id="fake"`` must use that phase. Those rows are not evaluation
+    trials. ``model_call_limit`` counts complete() calls across the
+    baseline and both arms and stops before another provider request.
     """
 
     if model_id == "fake" and phase != "harness":
         raise ValueError("a fake model trace must use phase harness")
+    if model_call_limit is not None and model_call_limit < 1:
+        raise ValueError("model_call_limit must be an integer of at least 1")
+    if model_call_limit is not None:
+        adapter = _LimitedAdapter(adapter, model_call_limit)
     fixture = get_fixture(incident_id)
     if fixture is None:
         raise ValueError(f"unknown incident: {incident_id}")
@@ -468,6 +530,8 @@ async def run_pair(
             return run
         restore(factual_state, checkpoint, content=checkpoint.visible, source="base")
         restore(mutant_state, checkpoint, content=mutation.mutated_visible, source="overlay")
+        _carry_same_turn_results(factual_state, baseline.state, checkpoint)
+        _carry_same_turn_results(mutant_state, baseline.state, checkpoint)
         factual_started = utc_now()
         factual_result = await run_agent(client, factual_state, adapter, resolver=FactualResolver())
         factual_ended = utc_now()
@@ -527,6 +591,26 @@ async def run_pair(
         )
         _write(trace_path, run)
         return run
+
+
+class _LimitedAdapter:
+    """Count model calls for one pair. The inner adapter is unchanged."""
+
+    def __init__(self, inner: ModelAdapter, limit: int) -> None:
+        self._inner = inner
+        self._limit = limit
+        self.used = 0
+
+    async def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        tools: Sequence[Mapping[str, Any]],
+        params: Mapping[str, Any],
+    ) -> ModelCompletion:
+        if self.used >= self._limit:
+            raise LoopBudget()
+        self.used += 1
+        return await self._inner.complete(messages, tools, params)
 
 
 @dataclass(frozen=True, slots=True)

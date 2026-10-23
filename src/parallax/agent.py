@@ -240,6 +240,16 @@ def factual_resolution(result: CallToolResult) -> ResolvedObservation:
     return ResolvedObservation(content=visible, is_error=False, source="base")
 
 
+class LoopBudget(Exception):
+    """Stop the loop before another model request.
+
+    The message is fixed so a budget stop cannot copy a provider body.
+    """
+
+    def __init__(self) -> None:
+        super().__init__("model-call budget exhausted")
+
+
 class FactualResolver:
     """Read the base server result. This resolver has an empty overlay."""
 
@@ -319,6 +329,11 @@ async def run_agent(
             completion = await adapter.complete(state.messages, state.tool_schemas, state.model_params)
             if not isinstance(completion, ModelCompletion):
                 raise TypeError("adapter returned a value that is not a completion")
+        except LoopBudget:
+            flags.append("budget_exhausted")
+            error = "model-call budget exhausted"
+            termination = "budget"
+            break
         except Exception as exc:  # noqa: BLE001 — an adapter failure is a ledger row, not a crash
             flags.append("provider_error")
             error = f"{type(exc).__name__}: {exc}"
