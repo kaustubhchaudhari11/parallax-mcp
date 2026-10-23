@@ -82,6 +82,7 @@ class Checkpoint:
     raw: dict[str, Any]
     visible: str
     latency_ms: float
+    call_id: str | None = None
 
 
 @dataclass
@@ -135,6 +136,7 @@ class CheckpointRecorder:
             raw=captured.raw,
             visible=captured.visible,
             latency_ms=latency_ms,
+            call_id=call.call_id,
         )
 
 
@@ -199,8 +201,9 @@ def first_action_divergence(left: Sequence[ChatMessage], right: Sequence[ChatMes
 def prefix_document(state: AgentState) -> dict[str, Any]:
     """The prefix that both arms must share.
 
-    Tool-call audit records, latency, and the decision score are not
-    part of this document.
+    Tool-call audit records, latency, provider response ids, and the
+    decision score are not part of this document. Response ids differ
+    across calls, so they stay on the trace and out of the shared hash.
     """
 
     return {
@@ -213,6 +216,8 @@ def prefix_document(state: AgentState) -> dict[str, Any]:
         "remaining_steps": state.step_budget - state.steps_used,
         "token_budget": state.token_budget,
         "tokens_used": state.tokens_used,
+        "tool_call_budget": state.tool_call_budget,
+        "tool_calls_used": state.tool_calls_used,
         "tool_schemas": state.tool_schemas,
     }
 
@@ -242,7 +247,14 @@ def restore(
 ) -> None:
     """Append one selected observation. This does not read a trace label."""
 
-    state.messages.append(ChatMessage(role="tool", content=content, tool_name=checkpoint.tool_name))
+    state.messages.append(
+        ChatMessage(
+            role="tool",
+            content=content,
+            tool_name=checkpoint.tool_name,
+            call_id=checkpoint.call_id,
+        )
+    )
     is_error = checkpoint.raw.get("is_error")
     state.tool_calls.append(
         ToolCallRecord(
@@ -292,6 +304,7 @@ async def run_pair(
     scenario_id: str | None,
     repeat_index: int,
     trace_path: Path | None = None,
+    tool_call_budget: int | None = None,
 ) -> PairRun:
     """Run one factual baseline and, when the branch is legal, both arms.
 
@@ -333,6 +346,7 @@ async def run_pair(
             token_budget=token_budget,
             fixture_hash=fixture_hash(fixture),
             tool_schemas=schemas,
+            tool_call_budget=tool_call_budget,
         )
         recorder = CheckpointRecorder(intervention.tool_name, incident_id)
         baseline_started = utc_now()
@@ -687,6 +701,7 @@ def _row_from_result(
         prefix_sha256=prefix,
         intervention_source_sha256=common.source_hash,
         execution_status=result.execution_status,
+        provider_response_ids=list(result.state.provider_response_ids),
     )
 
 

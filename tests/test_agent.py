@@ -127,8 +127,11 @@ def test_prefix_hash_covers_the_shared_document_only() -> None:
         "remaining_steps",
         "token_budget",
         "tokens_used",
+        "tool_call_budget",
+        "tool_calls_used",
         "tool_schemas",
     }
+    assert "provider_response_ids" not in document
     assert "oracle_decision" not in document
     assert "tool_calls" not in document
     left = copy_state(state)
@@ -324,5 +327,95 @@ def test_a_parsed_decision_after_a_tool_error_stays_completed() -> None:
         assert result.parse_ok is True
         assert result.decision_parsed == "ESCALATE"
         assert "tool_error" in result.flags
+
+    anyio.run(main, backend="asyncio")
+
+
+class _TwoTools:
+    async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+        del tools, params
+        if any(message.role == "tool" for message in messages):  # type: ignore[attr-defined]
+            return ModelCompletion(content=SCRIPTED_DECISION, response_id="resp_final")
+        return ModelCompletion(
+            content="",
+            response_id="resp_tools",
+            tool_calls=(
+                ToolRequest(name="get_metrics", arguments={"incident_id": "F000"}, call_id="call_metrics"),
+                ToolRequest(name="get_logs", arguments={"incident_id": "F000"}, call_id="call_logs"),
+            ),
+        )
+
+
+class _OverBudget:
+    async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+        del messages, tools, params
+        return ModelCompletion(
+            content="",
+            tool_calls=(
+                ToolRequest(name="get_metrics", arguments={"incident_id": "F000"}),
+                ToolRequest(name="get_logs", arguments={"incident_id": "F000"}),
+            ),
+        )
+
+
+class _BadArguments:
+    async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+        del messages, tools, params
+        return ModelCompletion(
+            content="",
+            tool_calls=(
+                ToolRequest(name="get_metrics", arguments={"incident_id": "F000"}),
+                ToolRequest(name="get_logs", arguments={"incident_id": ""}),
+            ),
+        )
+
+
+def test_multiple_tool_calls_keep_provider_ids() -> None:
+    client = _StubClient()
+
+    async def main() -> None:
+        result = await run_agent(client, _state(), _TwoTools(), resolver=FactualResolver())
+        assert client.calls == ["get_metrics", "get_logs"]
+        assert result.execution_status == "completed"
+        tool_messages = [message for message in result.state.messages if message.role == "tool"]
+        assert [message.call_id for message in tool_messages] == ["call_metrics", "call_logs"]
+        assert result.state.provider_response_ids == ["resp_tools", "resp_final"]
+        assert "provider_response_ids" not in prefix_document(result.state)
+        assert result.state.missing_usage is True
+        assert result.state.input_tokens == 0
+
+    anyio.run(main, backend="asyncio")
+
+
+def test_tool_call_budget_stops_before_another_mcp_call() -> None:
+    client = _StubClient()
+
+    async def main() -> None:
+        result = await run_agent(
+            client,
+            _state(tool_call_budget=1),
+            _OverBudget(),
+            resolver=FactualResolver(),
+        )
+        assert client.calls == ["get_metrics"]
+        assert result.state.tool_calls_used == 1
+        assert result.termination == "budget"
+        assert result.execution_status == "budget_exhausted"
+        assert result.decision_parsed is None
+
+    anyio.run(main, backend="asyncio")
+
+
+def test_malformed_tool_arguments_are_not_dispatched() -> None:
+    client = _StubClient()
+
+    async def main() -> None:
+        result = await run_agent(client, _state(), _BadArguments(), resolver=FactualResolver())
+        assert client.calls == ["get_metrics"]
+        assert result.execution_status == "invalid_tool"
+        rejected = result.state.tool_calls[-1]
+        assert rejected.name == "get_logs"
+        assert rejected.dispatched is False
+        assert rejected.source == "rejected"
 
     anyio.run(main, backend="asyncio")

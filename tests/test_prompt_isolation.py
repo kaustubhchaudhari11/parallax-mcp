@@ -1,6 +1,7 @@
 """Prompt and snapshot isolation. Gold labels stay out of the loop input."""
 
 import ast
+import tomllib
 from pathlib import Path
 
 from parallax.agent import build_initial_state
@@ -12,6 +13,8 @@ from parallax.replay import Checkpoint, copy_state, prefix_document, restore
 ROOT = Path(__file__).resolve().parents[1]
 DECISION_WORDS = ("MONITOR", "INVESTIGATE", "ESCALATE")
 NETWORK_MODULES = {"openai", "anthropic", "httpx", "requests", "headroom", "streamlit", "urllib"}
+PROVIDER_PACKAGES = {"openai", "anthropic", "headroom", "streamlit"}
+CORE_MODULES = ("agent.py", "prompt.py", "replay.py", "mutate.py", "trace.py", "capture.py")
 
 
 def _imports(path: Path) -> set[str]:
@@ -24,6 +27,17 @@ def _imports(path: Path) -> set[str]:
             modules.add(node.module.split(".")[0])
             modules.add(node.module)
     return modules
+
+
+def _requirement_name(requirement: str) -> str:
+    name = requirement.split(";", 1)[0].strip().split("[", 1)[0]
+    for separator in ("=", "<", ">", "!", "~", " "):
+        name = name.split(separator, 1)[0]
+    return name.strip().lower()
+
+
+def _requirement_names(requirements: list[str]) -> set[str]:
+    return {_requirement_name(item) for item in requirements}
 
 
 def test_policy_states_the_thresholds_and_names_no_fixture() -> None:
@@ -111,12 +125,29 @@ def test_loop_modules_do_not_import_labels_or_a_provider() -> None:
     assert "parallax.scenarios" not in replay
     assert "parallax.oracle" in replay
     assert "parallax.oracle" in mutate
-    for name in ("agent.py", "prompt.py", "replay.py", "mutate.py", "trace.py", "capture.py"):
+    for name in CORE_MODULES:
         modules = _imports(source / name)
         assert modules.isdisjoint(NETWORK_MODULES)
+        assert "parallax.openai_adapter" not in modules
         text = (source / name).read_text(encoding="utf-8").lower()
         assert "headroom" not in text
-    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
-    assert "headroom" not in project
-    assert "openai" not in project
-    assert "streamlit" not in project
+    project_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
+    assert "headroom" not in project_text
+    assert "streamlit" not in project_text
+    with (ROOT / "pyproject.toml").open("rb") as handle:
+        document = tomllib.load(handle)
+    project = document["project"]
+    base = _requirement_names(project["dependencies"])
+    dev = _requirement_names(document["dependency-groups"]["dev"])
+    assert base.isdisjoint(PROVIDER_PACKAGES)
+    assert dev.isdisjoint(PROVIDER_PACKAGES)
+    assert "openai" not in base
+    extras = project["optional-dependencies"]
+    for extra_name, requirements in extras.items():
+        names = _requirement_names(requirements)
+        if extra_name == "live":
+            assert "openai" in names
+            assert "python-dotenv" in names
+            assert names.isdisjoint(PROVIDER_PACKAGES - {"openai"})
+            continue
+        assert "openai" not in names

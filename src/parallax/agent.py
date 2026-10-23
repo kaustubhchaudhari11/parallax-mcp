@@ -33,6 +33,7 @@ class ToolRequest(BaseModel):
 
     name: str
     arguments: dict[str, Any]
+    call_id: str | None = None
 
 
 class ChatMessage(BaseModel):
@@ -44,6 +45,9 @@ class ChatMessage(BaseModel):
     content: str
     tool_calls: tuple[ToolRequest, ...] = ()
     tool_name: str | None = None
+    call_id: str | None = None
+    response_id: str | None = None
+    continuation: tuple[dict[str, Any], ...] = ()
 
 
 class ModelUsage(BaseModel):
@@ -63,6 +67,8 @@ class ModelCompletion(BaseModel):
     content: str = ""
     tool_calls: tuple[ToolRequest, ...] = ()
     usage: ModelUsage | None = None
+    response_id: str | None = None
+    continuation: tuple[dict[str, Any], ...] = ()
 
 
 class AgentState(BaseModel):
@@ -85,6 +91,9 @@ class AgentState(BaseModel):
     prompt_hash: str
     fixture_hash: str
     tool_schemas: list[dict[str, Any]]
+    tool_call_budget: int | None = None
+    tool_calls_used: int = 0
+    provider_response_ids: list[str] = Field(default_factory=list)
     tool_calls: list[ToolCallRecord] = Field(default_factory=list)
 
 
@@ -165,6 +174,7 @@ def build_initial_state(
     token_budget: int | None,
     fixture_hash: str,
     tool_schemas: Sequence[Mapping[str, Any]],
+    tool_call_budget: int | None = None,
 ) -> AgentState:
     """Build S0. The messages are the policy and the incident task."""
 
@@ -182,6 +192,7 @@ def build_initial_state(
         prompt_hash=prompt_hash(incident_id),
         fixture_hash=fixture_hash,
         tool_schemas=[dict(schema) for schema in tool_schemas],
+        tool_call_budget=tool_call_budget,
     )
 
 
@@ -315,11 +326,15 @@ async def run_agent(
             break
         state.steps_used += 1
         _record_usage(state, completion.usage)
+        if completion.response_id:
+            state.provider_response_ids.append(completion.response_id)
         state.messages.append(
             ChatMessage(
                 role="assistant",
                 content=completion.content,
                 tool_calls=completion.tool_calls,
+                response_id=completion.response_id,
+                continuation=completion.continuation,
             )
         )
         if not completion.tool_calls:
@@ -327,7 +342,7 @@ async def run_agent(
             produced_final = True
             termination = "decision"
             break
-        rejected = await _dispatch_tools(
+        dispatch = await _dispatch_tools(
             client,
             state,
             completion,
@@ -335,7 +350,10 @@ async def run_agent(
             checkpoint=checkpoint,
             flags=flags,
         )
-        if rejected:
+        if dispatch == "budget":
+            termination = "budget"
+            break
+        if dispatch == "rejected":
             final_content = completion.content or None
             produced_final = bool(completion.content)
             termination = "rejected_tool"
@@ -371,10 +389,10 @@ async def _dispatch_tools(
     resolver: ObservationResolver,
     checkpoint: CheckpointSink | None,
     flags: list[str],
-) -> bool:
+) -> str | None:
     for call in completion.tool_calls:
         arguments = dict(call.arguments)
-        if call.name not in ALLOWED_TOOLS:
+        if call.name not in ALLOWED_TOOLS or not _valid_tool_arguments(call):
             state.tool_calls.append(
                 ToolCallRecord(
                     name=call.name,
@@ -383,7 +401,11 @@ async def _dispatch_tools(
                     source="rejected",
                 )
             )
-            return True
+            return "rejected"
+        if state.tool_call_budget is not None and state.tool_calls_used >= state.tool_call_budget:
+            flags.append("budget_exhausted")
+            return "budget"
+        state.tool_calls_used += 1
         started = _now()
         result = await client.call_tool(call.name, arguments)
         latency_ms = (_now() - started) * 1000
@@ -395,7 +417,9 @@ async def _dispatch_tools(
         if resolved.flag is not None:
             flags.append(resolved.flag)
         visible = resolved.content
-        state.messages.append(ChatMessage(role="tool", content=visible, tool_name=call.name))
+        state.messages.append(
+            ChatMessage(role="tool", content=visible, tool_name=call.name, call_id=call.call_id)
+        )
         captured = capture_result(result)
         state.tool_calls.append(
             ToolCallRecord(
@@ -410,7 +434,16 @@ async def _dispatch_tools(
                 source=resolved.source,
             )
         )
-    return False
+    return None
+
+
+def _valid_tool_arguments(call: ToolRequest) -> bool:
+    """Accept only a non-empty string incident id. Other keys are rejected."""
+
+    if set(call.arguments) != {"incident_id"}:
+        return False
+    incident_id = call.arguments["incident_id"]
+    return isinstance(incident_id, str) and bool(incident_id)
 
 
 def _record_usage(state: AgentState, usage: ModelUsage | None) -> None:
