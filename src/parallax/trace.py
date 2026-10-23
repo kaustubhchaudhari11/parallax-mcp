@@ -24,6 +24,7 @@ ExecutionStatus = Literal[
     "tool_error",
     "model_error",
 ]
+TRACE_SCHEMA_VERSION = 1
 EXECUTION_STATUSES = frozenset(
     {
         "completed",
@@ -69,6 +70,19 @@ class ToolCallRecord(BaseModel):
     source: Literal["base", "overlay", "rejected"]
 
 
+class ProviderErrorMetadata(BaseModel):
+    """Sanitized provider failure fields. Request and response bodies are excluded."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    stage: Literal["request", "response_parsing", "continuation", "agent_controller"]
+    exception_class: str
+    http_status: int | None = None
+    error_code: str | None = None
+    parameter: str | None = None
+    request_id: str | None = None
+
+
 class TraceRecord(BaseModel):
     """One ledger row. Harness rows are control-flow fixtures, not results."""
 
@@ -104,12 +118,14 @@ class TraceRecord(BaseModel):
     predicate_d: bool | None
     flags: list[str] = Field(default_factory=list)
     error: str | None
+    provider_error: ProviderErrorMetadata | None = None
     started_at: str
     ended_at: str
     prefix_sha256: str | None
     intervention_source_sha256: str
     execution_status: ExecutionStatus | None = None
     provider_response_ids: list[str] = Field(default_factory=list)
+    experiment_id: str | None = None
 
     @model_validator(mode="after")
     def row_is_internally_consistent(self) -> Self:

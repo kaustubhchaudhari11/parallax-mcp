@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from parallax.capture import capture_result, sha256_text
 from parallax.observe import model_visible_observation
 from parallax.prompt import POLICY, prompt_hash, user_message
-from parallax.trace import ExecutionStatus, ToolCallRecord
+from parallax.trace import ExecutionStatus, ProviderErrorMetadata, ToolCallRecord
 
 ALLOWED_TOOLS = frozenset({"get_metrics", "get_logs", "get_deployment"})
 OUTPUT_DECISIONS = frozenset({"MONITOR", "INVESTIGATE", "ESCALATE"})
@@ -161,6 +161,7 @@ class AgentResult:
     parse_ok: bool
     flags: tuple[str, ...]
     error: str | None
+    provider_error: ProviderErrorMetadata | None
     termination: str
     execution_status: ExecutionStatus
 
@@ -313,6 +314,7 @@ async def run_agent(
 
     flags: list[str] = []
     error: str | None = None
+    provider_error: ProviderErrorMetadata | None = None
     termination = "decision"
     final_content: str | None = None
     produced_final = False
@@ -337,6 +339,15 @@ async def run_agent(
         except Exception as exc:  # noqa: BLE001 — an adapter failure is a ledger row, not a crash
             flags.append("provider_error")
             error = f"{type(exc).__name__}: {exc}"
+            metadata = getattr(exc, "metadata", None)
+            if isinstance(metadata, ProviderErrorMetadata):
+                provider_error = metadata
+            else:
+                exception_class = type(exc).__name__
+                provider_error = ProviderErrorMetadata(
+                    stage="agent_controller",
+                    exception_class=exception_class if exception_class.isidentifier() else "Exception",
+                )
             termination = "provider"
             break
         state.steps_used += 1
@@ -386,6 +397,7 @@ async def run_agent(
         parse_ok=inspection.parse_ok,
         flags=unique_flags,
         error=error,
+        provider_error=provider_error,
         termination=termination,
         execution_status=classify_execution(
             termination=termination,

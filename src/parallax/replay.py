@@ -307,8 +307,11 @@ def _carry_same_turn_results(branch: AgentState, baseline: AgentState, checkpoin
 
 
 def _checkpoint_assistant_index(messages: Sequence[ChatMessage], checkpoint: Checkpoint) -> int | None:
-    target = checkpoint.state.messages[-1]
-    if target.role != "assistant":
+    target = next(
+        (message for message in reversed(checkpoint.state.messages) if message.role == "assistant"),
+        None,
+    )
+    if target is None:
         return None
     for index, message in enumerate(messages):
         if message.role != "assistant":
@@ -780,6 +783,7 @@ def _row_from_result(
         predicate_d=None if bits is None else bits[2],
         flags=flags,
         error=error,
+        provider_error=result.provider_error,
         started_at=started_at,
         ended_at=ended_at,
         prefix_sha256=prefix,

@@ -536,11 +536,9 @@ class _APIStatus(Exception):
         self.status_code = 400
         self.request_id = "req_abc"
         self.body = {
-            "error": {
-                "message": "sk-secret",
-                "param": "temperature",
-                "code": "unsupported_parameter",
-            }
+            "message": "sk-secret",
+            "param": "temperature",
+            "code": "unsupported_parameter",
         }
 
 
@@ -558,6 +556,14 @@ def test_request_errors_keep_status_code_and_drop_the_body() -> None:
         assert failure.error_code == "unsupported_parameter"
         assert failure.request_id == "req_abc"
         assert failure.parameter == "temperature"
+        assert failure.metadata.model_dump() == {
+            "stage": "request",
+            "exception_class": "_APIStatus",
+            "http_status": 400,
+            "error_code": "unsupported_parameter",
+            "parameter": "temperature",
+            "request_id": "req_abc",
+        }
         assert "sk-" not in str(failure)
         assert "raw body" not in str(failure)
 
