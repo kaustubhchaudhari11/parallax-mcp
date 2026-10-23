@@ -29,14 +29,15 @@ been called, and no experiment result exists.
 
 ## Status
 
-Day 1 is implemented. Day 2 and Day 3 are not.
+Day 1 is implemented. Milestone 2A replays a scripted adapter without a live model. A provider adapter, hypothesis rates, and Day 3 are not implemented.
 
 | Piece | State |
 | --- | --- |
 | Charter, protocol, architecture, literature review | Written |
 | Synthetic fixtures, decision oracle, MCP server, client tests | Implemented |
 | Canonical model-visible JSON | Implemented |
-| Agent loop, mutation, replay, JSONL traces | Not implemented |
+| Deterministic mutation, snapshot replay, JSONL traces | Implemented, scripted adapter only |
+| Live model adapter and hypothesis rates | Not implemented |
 | Experiment results | None |
 | Streamlit comparison view | Not implemented |
 | Headroom | Not a dependency and not on the measurement path |
@@ -65,9 +66,11 @@ fixture store -> get_metrics | get_logs | get_deployment
                      +--> canonical JSON of structured_content
 ```
 
-Capture, mutation, the agent loop, and replay are drawn in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). They are not in this
-tree.
+Capture, mutation, the agent loop, and replay now live beside the
+server. The server is still the factual world. Replay applies an
+intervention in a branch-local overlay and does not write the fixture
+store. The drawing in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+remains the contract.
 
 ## Observation contract
 
@@ -271,15 +274,36 @@ the session actually selected.
 `import mcp.server.fastmcp` fails on the installed SDK. The server class
 is `mcp.server.mcpserver.MCPServer`.
 
+## Milestone 2A
+
+One agent loop, exact observation capture, the named mutation functions,
+a snapshot boundary, factual and mutant arms, and JSONL traces. The
+scripted adapter used by tests is a function of the transcript. Traces
+from those tests use `model_id="fake"` and `phase="harness"`. They are
+not hypothesis rates. No provider client is installed.
+
+The fixture store is the Day 1 store. `F010` has one error line, and
+reversing that line does not change canonical JSON. S07 applies
+`h1-log-order` to `F110`, whose ten existing error lines already differ
+by message and timestamp. The predicates and the oracle decision stay
+the same. The correction is recorded in
+[`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md).
+
+`run_pair()` records a fresh baseline for that pair. A scheduler that
+shares one checkpoint across scenarios is planned for Milestone 2B and
+is not part of this milestone.
+
+Loop rows carry `execution_status`. That field records how the loop
+stopped. It is not an oracle score. Rows with `phase="harness"` are
+scripted controls. `research_eligible` excludes them from empirical
+hypothesis rates. No hypothesis rate is computed in this milestone.
+
 ## Still planned
 
-### Day 2 — agent, capture, mutation, and replay
+### Milestone 2B — live model adapter
 
-One agent loop, exact observation capture, pure mutation functions,
-snapshot replay of a factual arm and a mutant arm, and JSONL traces.
-The oracle stays out of the prompt. Unit tests do not call a model. A
-live call is optional and skipped when no key is set. A fake model used
-in a control-flow test is labeled as a fake and is not a research result.
+A provider-backed adapter, skipped when no key is set, is not
+implemented. Pilot and exploratory trials have not been run.
 
 ### Day 3 — paired evaluation and the comparison view
 

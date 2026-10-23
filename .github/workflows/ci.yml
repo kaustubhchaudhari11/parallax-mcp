@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.2"
+          python-version: "3.12"
+
+      - name: Install dependencies from the lockfile
+        run: uv sync --frozen --all-groups
+
+      - name: Run tests
+        run: uv run pytest -q
+
+      - name: Run Ruff
+        run: uv run ruff check .
