@@ -22,6 +22,7 @@ from dotenv import load_dotenv
 from openai import AsyncOpenAI
 
 from parallax.agent import ChatMessage, ModelCompletion, ModelUsage, ToolRequest
+from parallax.trace import ProviderErrorMetadata
 
 _STAGES = frozenset({"request", "response_parsing", "continuation", "agent_controller"})
 _TOKEN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -439,6 +440,14 @@ class ProviderCallError(Exception):
         self.error_code = _safe_token(error_code, 64)
         self.request_id = _safe_token(request_id, 128)
         self.parameter = _safe_token(parameter, 64)
+        self.metadata = ProviderErrorMetadata(
+            stage=self.stage,
+            exception_class=self.exception_type,
+            http_status=self.status_code,
+            error_code=self.error_code,
+            parameter=self.parameter,
+            request_id=self.request_id,
+        )
         super().__init__(self.public_text())
 
     def public_text(self) -> str:
@@ -473,11 +482,13 @@ def _failure_from_exception(exc: BaseException, stage: str) -> ProviderCallError
     body = getattr(exc, "body", None)
     if isinstance(body, dict):
         err = body.get("error")
-        if isinstance(err, dict):
-            error_code = err.get("code")
-            parameter = err.get("param")
+        details = err if isinstance(err, dict) else body
+        error_code = details.get("code")
+        parameter = details.get("param")
     if error_code is None:
         error_code = getattr(exc, "code", None)
+    if parameter is None:
+        parameter = getattr(exc, "param", None)
     return ProviderCallError(
         stage=stage,
         exception_type=type(exc).__name__,

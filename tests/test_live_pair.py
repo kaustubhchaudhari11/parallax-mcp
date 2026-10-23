@@ -16,6 +16,8 @@ from parallax.live_pair import (
     max_model_requests,
     pair_model_params,
 )
+from parallax.metrics import account_pair
+from parallax.mutate import H3_IGNORE_POLICY
 from parallax.openai_adapter import OpenAIAdapter
 from parallax.oracle import decide
 from parallax.replay import prefix_sha256, run_pair
@@ -326,6 +328,76 @@ def test_same_turn_siblings_stay_factual_on_both_arms() -> None:
     assert run.mutant.tool_calls[0].source == "overlay"  # type: ignore[attr-defined]
     assert run.mutant.tool_calls[1].source == "base"  # type: ignore[attr-defined]
     assert run.factual.tool_calls[0].source == "base"  # type: ignore[attr-defined]
+
+
+def test_h3_later_same_turn_call_carries_every_provider_output() -> None:
+    class _H3BatchResponses:
+        def __init__(self) -> None:
+            self.history: list[dict[str, object]] = []
+            self.calls = 0
+
+        async def create(self, **kwargs: object) -> object:
+            self.history.append(kwargs)
+            self.calls += 1
+            if self.calls == 1:
+                calls = [
+                    _function_call("get_metrics", "call_metrics"),
+                    _function_call("get_logs", "call_logs"),
+                    _function_call("get_deployment", "call_deploy"),
+                ]
+                return SimpleNamespace(
+                    id="resp_pre",
+                    output=calls,
+                    usage=SimpleNamespace(input_tokens=3, output_tokens=2),
+                    error=None,
+                    status="completed",
+                )
+            return _decision_response(
+                f"resp_post_{self.calls}",
+                SCRIPTED_DECISION,
+                SimpleNamespace(input_tokens=1, output_tokens=1),
+            )
+
+    responses = _H3BatchResponses()
+    adapter = OpenAIAdapter(SimpleNamespace(responses=responses), model="gpt-6-luna")
+
+    async def main() -> object:
+        return await run_pair(
+            incident_id="F000",
+            intervention_id="h3-ignore-policy",
+            adapter=adapter,
+            model_id="gpt-6-luna",
+            model_params=PARAMS,
+            step_budget=4,
+            token_budget=None,
+            phase="harness",
+            scenario_id="S17",
+            repeat_index=0,
+            model_call_limit=7,
+        )
+
+    run = _drive(main)
+    assert run.factual is not None  # type: ignore[attr-defined]
+    assert all(  # type: ignore[attr-defined]
+        row.execution_status == "completed"
+        for row in (run.baseline, run.factual, run.mutant)
+    )
+    assert len(responses.history) == 4
+    factual_input = responses.history[2]["input"]
+    mutant_input = responses.history[3]["input"]
+    assert isinstance(factual_input, list)
+    assert isinstance(mutant_input, list)
+    expected_ids = ["call_metrics", "call_logs", "call_deploy"]
+    assert [item["call_id"] for item in factual_input] == expected_ids
+    assert [item["call_id"] for item in mutant_input] == expected_ids
+    assert responses.history[2]["previous_response_id"] == "resp_pre"
+    assert responses.history[3]["previous_response_id"] == "resp_pre"
+    assert H3_IGNORE_POLICY not in str(factual_input[1]["output"])
+    assert H3_IGNORE_POLICY in str(mutant_input[1]["output"])
+    assert factual_input[2]["output"] == mutant_input[2]["output"]
+    accounting = account_pair(run)  # type: ignore[arg-type]
+    assert accounting.deduped_tool_calls == 3
+    assert accounting.deduped_latency_ms is not None
 
 
 def _function_call(name: str, call_id: str) -> SimpleNamespace:
