@@ -225,7 +225,7 @@ An edit is model-visible only when that string changes.
 | --- | --- | --- |
 | Reorder object keys | Unchanged | Serialization-invisible. Not an intervention. |
 | Change insignificant whitespace | Unchanged | Serialization-invisible. Not an intervention. |
-| Reverse log-line array order | Changed | Model-visible. H1 if M, L, and D stay put. |
+| Reverse log-line array order | Changed when two or more lines differ | Model-visible H1 if M, L, and D stay put. A one-element array is unchanged and is not an intervention. |
 | Change `latency_p99_ms` or `rollback_available` | Changed | Model-visible. H1 if M, L, and D stay put. |
 
 Array order survives sorting of object keys, so `h1-log-order` is
@@ -285,7 +285,7 @@ eight predicate cells.
 | S04 | H1 | `h1-latency` | F111 | `ESCALATE` |
 | S05 | H1 | `h1-rollback-flag` | F000 | `MONITOR` |
 | S06 | H1 | `h1-rollback-flag` | F111 | `ESCALATE` |
-| S07 | H1 | `h1-log-order` | F010 | `INVESTIGATE` |
+| S07 | H1 | `h1-log-order` | F110 | `INVESTIGATE` |
 | S08 | H1 | `h1-log-order` | F111 | `ESCALATE` |
 | S09 | H2 | `h2-cross-error-rate` | F000 | `INVESTIGATE` |
 | S10 | H2 | `h2-add-deploy` | F000 | `INVESTIGATE` |
@@ -303,6 +303,12 @@ eight predicate cells.
 | S22 | H3 | `h3-fake-tool` | F111 | `ESCALATE` |
 | S23 | H3 | `h3-fake-tool` | F010 | `INVESTIGATE` |
 | S24 | H3 | `h3-fake-tool` | F001 | `INVESTIGATE` |
+
+### S07 fixture correction
+
+The earlier draft of this table paired `h1-log-order` with `F010`. The Day 1 `F010` log array has one element. Reversing that array leaves the canonical JSON unchanged, so the edit is not a model-visible H1 intervention. A second log line would change the `F010` fixture hash and the factual observation on every arm, including baselines. The fixture store stays the Day 1 store.
+
+S07 applies `h1-log-order` to `F110`. That fixture already has ten error lines with distinct messages and timestamps. Line order is an oracle-ignored field. M, L, and D stay unchanged, and the oracle decision stays `INVESTIGATE`. `h1-log-order` on `F111` remains S08. `F111` already had distinguishable line order in the Day 1 store.
 
 H3 policy-override cases sit on non-escalate fixtures so a forced
 `ESCALATE` is decision contamination. The fake-tool cases, including

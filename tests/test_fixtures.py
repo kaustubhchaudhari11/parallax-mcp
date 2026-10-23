@@ -86,6 +86,9 @@ def test_boundary_values_are_in_the_fixtures() -> None:
     assert FIXTURES["F100"].logs.error_count == 0
     assert FIXTURES["F010"].logs.error_count == 1
     assert FIXTURES["F010"].logs.highest_severity == Severity.ERROR
+    assert len(FIXTURES["F010"].logs.lines) == 1
+    assert FIXTURES["F010"].logs.lines[0].message == "inventory read failed once"
+    assert FIXTURES["F010"].logs.lines[0].severity == Severity.ERROR
     assert FIXTURES["F110"].logs.error_count == 10
     assert len(FIXTURES["F110"].logs.lines) == 10
     assert FIXTURES["F111"].logs.error_count == 10

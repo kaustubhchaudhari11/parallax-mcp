@@ -1,7 +1,7 @@
 """Eight immutable synthetic incidents, one predicate cell each.
 
 The id suffix is the bit string M, L, D. This module does not record
-what decision those bits imply.
+what decision those bits imply. These eight records are the Day 1 store.
 """
 
 from collections.abc import Mapping
