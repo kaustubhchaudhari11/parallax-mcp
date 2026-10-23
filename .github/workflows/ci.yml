@@ -20,10 +20,10 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies from the lockfile
-        run: uv sync --frozen --all-groups
+        run: uv sync --frozen --all-groups --extra live
 
       - name: Run tests
-        run: uv run pytest -q
+        run: uv run --extra live pytest -q
 
       - name: Run Ruff
-        run: uv run ruff check .
+        run: uv run --extra live ruff check .

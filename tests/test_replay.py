@@ -546,3 +546,48 @@ def test_fake_model_research_phase_is_rejected() -> None:
             )
 
     _drive(main)
+
+
+class _MarkedResponses:
+    async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+        del tools, params
+        if any(message.role == "tool" for message in messages):  # type: ignore[attr-defined]
+            return ModelCompletion(content=SCRIPTED_DECISION, response_id="resp_final")
+        return ModelCompletion(
+            content="",
+            response_id="resp_tool",
+            tool_calls=(
+                ToolRequest(name="get_metrics", arguments={"incident_id": "F000"}, call_id="call_live"),
+            ),
+        )
+
+
+def test_trace_keeps_provider_ids_and_null_usage() -> None:
+    async def main() -> object:
+        return await run_pair(
+            incident_id="F000",
+            intervention_id="h1-latency",
+            adapter=_MarkedResponses(),
+            model_id="fake",
+            model_params=PARAMS,
+            step_budget=4,
+            token_budget=None,
+            phase="harness",
+            scenario_id="S01",
+            repeat_index=0,
+        )
+
+    run = _drive(main)
+    assert run.baseline.provider_response_ids == ["resp_tool", "resp_final"]  # type: ignore[attr-defined]
+    assert run.baseline.usage is None  # type: ignore[attr-defined]
+    assert run.baseline.model_id == "fake"  # type: ignore[attr-defined]
+    assert run.baseline.execution_status == "completed"  # type: ignore[attr-defined]
+    assert run.factual.provider_response_ids == ["resp_tool", "resp_final"]  # type: ignore[attr-defined]
+    assert run.mutant.provider_response_ids == ["resp_tool", "resp_final"]  # type: ignore[attr-defined]
+    snapshot = run.snapshot  # type: ignore[attr-defined]
+    assert snapshot is not None
+    document = replay_module.prefix_document(snapshot.state)
+    assert "provider_response_ids" not in document
+    assert snapshot.state.messages[-1].response_id == "resp_tool"
+    assert document["messages"][-1]["response_id"] == "resp_tool"
+    assert "resp_final" not in json.dumps(document)

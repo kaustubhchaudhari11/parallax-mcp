@@ -29,7 +29,7 @@ been called, and no experiment result exists.
 
 ## Status
 
-Day 1 is implemented. Milestone 2A replays a scripted adapter without a live model. A provider adapter, hypothesis rates, and Day 3 are not implemented.
+Day 1 is implemented. Milestone 2A replays a scripted adapter without a live model. An optional OpenAI adapter is covered by offline tests. Hypothesis rates and Day 3 are not implemented.
 
 | Piece | State |
 | --- | --- |
@@ -37,7 +37,7 @@ Day 1 is implemented. Milestone 2A replays a scripted adapter without a live mod
 | Synthetic fixtures, decision oracle, MCP server, client tests | Implemented |
 | Canonical model-visible JSON | Implemented |
 | Deterministic mutation, snapshot replay, JSONL traces | Implemented, scripted adapter only |
-| Live model adapter and hypothesis rates | Not implemented |
+| Live model adapter and hypothesis rates | Optional `live` extra. Offline tests only. No live trial and no rates |
 | Experiment results | None |
 | Streamlit comparison view | Not implemented |
 | Headroom | Not a dependency and not on the measurement path |
@@ -280,7 +280,7 @@ One agent loop, exact observation capture, the named mutation functions,
 a snapshot boundary, factual and mutant arms, and JSONL traces. The
 scripted adapter used by tests is a function of the transcript. Traces
 from those tests use `model_id="fake"` and `phase="harness"`. They are
-not hypothesis rates. No provider client is installed.
+not hypothesis rates. The OpenAI SDK is an optional `live` extra, not a core dependency. The agent loop does not import it.
 
 The fixture store is the Day 1 store. `F010` has one error line, and
 reversing that line does not change canonical JSON. S07 applies
@@ -300,10 +300,24 @@ hypothesis rates. No hypothesis rate is computed in this milestone.
 
 ## Still planned
 
-### Milestone 2B — live model adapter
+### Milestone 2B — live evaluation
 
-A provider-backed adapter, skipped when no key is set, is not
-implemented. Pilot and exploratory trials have not been run.
+`OpenAIAdapter` can be constructed from the `live` extra. Offline tests
+inject a fake client. `run_pair()` does not select the adapter. A single
+incident smoke command is available. A live F000 run returned
+`model_error` and did not print the provider exception. The diagnostic
+retry is `--debug-errors`. It has not been executed:
+
+```powershell
+uv run --extra live python -m parallax.live --incident F000 --dry-run
+uv run --extra live python -m parallax.live --incident F000 --debug-errors
+```
+
+The dry-run loads `<project-root>/.env` and prints whether
+`OPENAI_API_KEY` is set. It does not print the key and does not call the
+provider. The second command is the live smoke test. Pilot and
+exploratory trials have not been run. A scheduler that reuses one
+checkpoint across scenarios is still not implemented.
 
 ### Day 3 — paired evaluation and the comparison view
 

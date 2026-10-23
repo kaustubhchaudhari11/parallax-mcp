@@ -109,6 +109,7 @@ class TraceRecord(BaseModel):
     prefix_sha256: str | None
     intervention_source_sha256: str
     execution_status: ExecutionStatus | None = None
+    provider_response_ids: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def row_is_internally_consistent(self) -> Self:
