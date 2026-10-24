@@ -19,6 +19,7 @@ import subprocess
 import sys
 import uuid
 from collections.abc import Mapping, Sequence
+from functools import partial
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, Literal
@@ -692,7 +693,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(_public_text(str(exc)), file=sys.stderr)
         return 2
     try:
-        result = anyio.run(execute_xray, spec, directory, adapter, resume=args.resume)
+        result = anyio.run(partial(execute_xray, spec, directory, adapter, resume=args.resume))
     except (TypeError, ValueError) as exc:
         print(_public_text(str(exc)), file=sys.stderr)
         return 2

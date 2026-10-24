@@ -193,6 +193,73 @@ def test_dry_run_prints_the_plan_and_does_not_construct_a_client(
     assert main(["--live"]) == 2
 
 
+def test_live_cli_forwards_resume_through_anyio(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """The real --live entry must call execute_xray. anyio.run does not accept resume=."""
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("parallax.openai_adapter.load_project_env", lambda: False)
+    monkeypatch.setenv("PARALLAX_MODEL", "gpt-test")
+    sentinel = object()
+    seen: list[bool] = []
+
+    def from_env() -> object:
+        return sentinel
+
+    async def execute(spec: object, output_dir: Path, adapter: object, *, resume: bool) -> XRayResult:
+        del output_dir
+        assert adapter is sentinel
+        seen.append(resume)
+        return XRayResult(
+            schema_version=spec.schema_version,  # type: ignore[attr-defined]
+            xray_id=spec.xray_id,  # type: ignore[attr-defined]
+            original_decision=None,
+            termination_reason="mocked",
+            minimality_definition=spec.minimality_definition,  # type: ignore[attr-defined]
+            minimality_claim="no verified flip",
+            minimal_edit=None,
+            proof_blockers=[],
+            shared_checkpoint=False,
+            checkpoint_id=None,
+            candidates=[],
+            provider_requests=0,
+            usage_deduped=None,
+            target_decision=None,
+            target_reached=False,
+            notes=[],
+        )
+
+    monkeypatch.setattr("parallax.openai_adapter.OpenAIAdapter.from_env", from_env)
+    monkeypatch.setattr("parallax.xray.execute_xray", execute)
+    output = tmp_path / "xray-live"
+    argv = [
+        "--live",
+        "--fixture",
+        "F100",
+        "--tool",
+        "get_metrics",
+        "--field",
+        "error_rate_bps",
+        "--candidates",
+        "499",
+        "501",
+        "--strategy",
+        "exhaustive",
+        "--output",
+        str(output),
+    ]
+    assert main(argv) == 0
+    assert main([*argv, "--resume"]) == 0
+    assert seen == [False, True]
+    printed = capsys.readouterr().out
+    assert "termination_reason=mocked" in printed
+    assert "sk-" not in printed
+    assert not (tmp_path / "runs").exists()
+
+
 def test_verified_flip_stops_at_the_nearest_tested_candidate(tmp_path: Path) -> None:
     before = get_fixture("F100")
     assert before is not None
