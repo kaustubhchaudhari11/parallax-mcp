@@ -6,11 +6,13 @@ hypothesis rate.
 """
 
 import json
+import os
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from parallax.capture import label_key_overlap
 
@@ -151,6 +153,31 @@ class TraceRecord(BaseModel):
         return self
 
 
+def drop_torn_jsonl_tail(path: Path, parse_line: Callable[[str], object]) -> None:
+    """Repair a crash that stopped before the closing newline.
+
+    A file that already ends with a newline is not rewritten. A final
+    line that parses gains that newline. A final line that does not
+    parse is removed. Earlier lines stay as they were.
+    """
+
+    if not path.is_file():
+        return
+    text = path.read_text(encoding="utf-8")
+    if not text or text.endswith("\n"):
+        return
+    lines = text.splitlines()
+    if not lines:
+        return
+    try:
+        parse_line(lines[-1])
+    except (ValidationError, ValueError):
+        body = "".join(f"{line}\n" for line in lines[:-1])
+    else:
+        body = text + "\n"
+    path.write_text(body, encoding="utf-8", newline="\n")
+
+
 def append_trace(path: Path, record: TraceRecord) -> None:
     """Append one JSON object and flush it."""
 
@@ -158,9 +185,11 @@ def append_trace(path: Path, record: TraceRecord) -> None:
     if "\n" in line or "\r" in line:
         raise ValueError("trace record must serialize to one line")
     path.parent.mkdir(parents=True, exist_ok=True)
+    drop_torn_jsonl_tail(path, TraceRecord.model_validate_json)
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(line + "\n")
         handle.flush()
+        os.fsync(handle.fileno())
 
 
 def research_eligible(record: TraceRecord) -> bool:
@@ -178,6 +207,7 @@ def read_traces(path: Path) -> list[TraceRecord]:
 
     if not path.exists():
         return []
+    drop_torn_jsonl_tail(path, TraceRecord.model_validate_json)
     rows: list[TraceRecord] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if line:

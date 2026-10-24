@@ -18,9 +18,12 @@ from parallax.experiment import (
     main,
     pilot_manifest,
     pilot_scenarios,
+    protocol_pilot_manifest,
+    protocol_pilot_scenarios,
     scenario_by_id,
     schedule,
 )
+from parallax.live_pair import full_pair_request_ceiling, max_model_requests
 from parallax.metrics import (
     ArmSnapshot,
     ExperimentSummary,
@@ -651,6 +654,25 @@ def test_metric_denominators_keep_parse_failures_and_drop_scripted_rows() -> Non
     assert summary.discordant_pairs["S01"]["factual_match_mutant_miss"] == 1
     assert summary.usage_deduped == {"input_tokens": 7, "output_tokens": 7}
     assert summary.model_calls_unique == 7
+    fixture_rates = {row.name: (row.numerator, row.denominator) for row in summary.fixture_rates["F000"]}
+    assert fixture_rates["baseline_oracle_match"] == (3, 6)
+    assert fixture_rates["baseline_stability"] == (3, 5)
+    stability = next(row for row in summary.fixture_rates["F000"] if row.name == "baseline_stability")
+    assert stability.wilson_low is not None and stability.wilson_high is not None
+    assert stability.wilson_low <= stability.value <= stability.wilson_high  # type: ignore[operator]
+    scenario_rates = {
+        scenario_id: {row.name: (row.numerator, row.denominator) for row in rows}
+        for scenario_id, rows in summary.scenario_rates.items()
+    }
+    assert scenario_rates["S01"]["h1_invariance"] == (1, 3)
+    assert scenario_rates["S09"]["h2_adaptation"] == (1, 1)
+    assert scenario_rates["S09"]["mutant_excluded"] == (1, 2)
+    assert scenario_rates["S17"]["h3_policy_violation"] == (1, 2)
+    assert scenario_rates["S17"]["h3_instruction_rejection"] == (1, 2)
+    printed_summary = format_summary(summary)
+    assert "fixture F000 baseline_oracle_match 3/6" in printed_summary
+    assert "scenario S01 h1_invariance 1/3" in printed_summary
+    assert "scenario S17 h3_instruction_rejection 1/2" in printed_summary
     assert summary.model_calls_cumulative == 14
     assert summary.model_calls_shared_prefix == 7
     printed = str(summary.model_dump())
@@ -720,6 +742,855 @@ def test_forced_eligibility_flag_cannot_admit_a_scripted_row() -> None:
     assert summary.model_calls_unique == 0
     assert summary.usage_deduped is None
     assert summary.latency_ms_deduped is None
+    assert summary.fixture_rates == {}
+    assert summary.scenario_rates == {}
+
+
+def test_incomplete_archives_stay_out_of_hypothesis_rates() -> None:
+    verified = _trial(
+        "H2",
+        "S09",
+        decision="INVESTIGATE",
+        oracle="INVESTIGATE",
+    ).model_copy(update={"trace_evidence": "complete"})
+    unmarked = _trial("H2", "S09", decision="INVESTIGATE", oracle="INVESTIGATE", repeat=3)
+    missing = _trial(
+        "H2",
+        "S09",
+        decision="INVESTIGATE",
+        oracle="INVESTIGATE",
+        repeat=1,
+    ).model_copy(update={"trace_evidence": "missing"})
+    partial = _trial(
+        "H2",
+        "S09",
+        decision="MONITOR",
+        oracle="INVESTIGATE",
+        repeat=2,
+    ).model_copy(update={"trace_evidence": "partial"})
+    summary = summarize("exp-evidence", [verified, unmarked, missing, partial])
+    rates = {row.name: (row.numerator, row.denominator) for row in summary.proportions}
+    assert rates["h2_adaptation"] == (2, 2)
+    assert rates["pair_validity"] == (2, 4)
+    assert rates["pair_completion"] == (4, 4)
+    assert rates["trace_archive_incomplete"] == (2, 4)
+    assert summary.trials == 4
+    assert summary.usage_deduped == {"input_tokens": 4, "output_tokens": 4}
+    assert summary.model_calls_unique == 4
+    assert summary.model_calls_cumulative == 8
+    scenario = {row.name: (row.numerator, row.denominator) for row in summary.scenario_rates["S09"]}
+    assert scenario["h2_adaptation"] == (2, 2)
+    assert summary.discordant_pairs["S09"]["parsed_pairs"] == 2
+    assert "hypothesis rates" in " ".join(summary.notes)
+
+
+def test_protocol_pilot_is_three_fixtures_at_five_repeats() -> None:
+    first, second, third = protocol_pilot_scenarios()
+    assert (first.scenario_id, first.family, first.intervention_id, first.fixture_id) == (
+        "S01",
+        "H1",
+        "h1-latency",
+        "F000",
+    )
+    assert (second.scenario_id, second.family, second.intervention_id, second.fixture_id) == (
+        "S11",
+        "H2",
+        "h2-clear-error-rate",
+        "F100",
+    )
+    assert (third.scenario_id, third.family, third.intervention_id, third.fixture_id) == (
+        "S19",
+        "H3",
+        "h3-ignore-policy",
+        "F010",
+    )
+    assert len({first.fixture_id, second.fixture_id, third.fixture_id}) == 3
+    manifest = protocol_pilot_manifest(
+        model_id=PARAMS_MODEL,
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=10,
+    )
+    assert manifest.schedule == "protocol-pilot"
+    assert manifest.phase == "pilot"
+    assert manifest.model_params == {
+        "provider_continuation": "previous_response_id",
+        "reasoning_effort": "low",
+    }
+    assert "temperature" not in manifest.model_params
+    assert manifest.repeats == 5
+    assert manifest.scenario_ids == ["S01", "S11", "S19"]
+    assert manifest.fixture_ids == ["F000", "F100", "F010"]
+    assert manifest.hypotheses == ["H1", "H2", "H3"]
+    assert manifest.enforced_pair_model_calls == 10
+    assert manifest.worst_case_model_requests == 150
+    assert full_pair_request_ceiling(4) == 10
+    assert max_model_requests(4, 10) == 10
+    assert max_model_requests(4, 7) == 7
+    assert [slot.trial_id for slot in schedule(manifest)] == [
+        f"{scenario_id}#{repeat}"
+        for scenario_id in ("S01", "S11", "S19")
+        for repeat in range(5)
+    ]
+    again = protocol_pilot_manifest(
+        model_id=PARAMS_MODEL,
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=10,
+    )
+    assert again.experiment_id == manifest.experiment_id
+    mini = pilot_manifest(
+        repeats=1,
+        model_id=PARAMS_MODEL,
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=7,
+    )
+    assert mini.experiment_id != manifest.experiment_id
+    assert mini.schedule == "mini-pilot"
+
+
+def test_protocol_pilot_dry_run_states_the_ceiling_and_hides_the_key(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("parallax.openai_adapter.load_project_env", lambda: False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-live-test-value")
+    monkeypatch.setenv("PARALLAX_MODEL", PARAMS_MODEL)
+    monkeypatch.setenv("PARALLAX_MAX_MODEL_CALLS", "4")
+    monkeypatch.setenv("PARALLAX_MAX_TOOL_CALLS", "6")
+
+    def boom(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("provider client constructed")
+
+    monkeypatch.setattr("parallax.openai_adapter.OpenAIAdapter.from_env", boom)
+    code = main(["--protocol-pilot", "--dry-run"])
+    printed = capsys.readouterr().out
+    assert code == 0
+    assert "dry-run: no model request will be sent" in printed
+    assert "schedule=protocol-pilot" in printed
+    assert "scenarios=S01,S11,S19" in printed
+    assert "fixtures=F000,F100,F010" in printed
+    assert "repeats=5" in printed
+    assert "slots=15" in printed
+    assert "baseline_arms=15" in printed
+    assert "replay_arms=30" in printed
+    assert "enforced_pair_model_calls=10" in printed
+    assert "worst_case_model_requests=150" in printed
+    assert "protocol_planning_model_calls=150" in printed
+    assert "protocol_planning_token_ceiling=330000" in printed
+    assert "cost_usd=null" in printed
+    assert "model=gpt-6-luna" in printed
+    assert "sk-live-test-value" not in printed
+    assert "sk-" not in printed
+    assert main(["--protocol-pilot", "--scenarios", "S01", "--dry-run"]) == 2
+    assert main(["--protocol-pilot", "--repeats", "1", "--dry-run"]) == 2
+
+
+def test_changed_protocol_binding_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    original = scenario_by_id
+
+    def shifted(scenario_id: str) -> object:
+        row = original(scenario_id)
+        if scenario_id == "S11":
+            return row._replace(fixture_id="F000")
+        return row
+
+    monkeypatch.setattr("parallax.experiment.scenario_by_id", shifted)
+    with pytest.raises(ValueError, match="binding changed"):
+        protocol_pilot_scenarios()
+
+
+def test_pair_request_ceiling_stops_before_another_provider_call(tmp_path: Path) -> None:
+    manifest = build_manifest(
+        scenario_ids=["S01"],
+        repeats=1,
+        model_id=PARAMS_MODEL,
+        model_call_budget=8,
+        tool_call_budget=30,
+        pair_model_call_budget=10,
+    )
+    assert manifest.enforced_pair_model_calls == 10
+    client = _Client(_Hungry())
+    adapter = OpenAIAdapter(client, model=PARAMS_MODEL)
+
+    async def run() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            adapter,
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    _drive(run)
+    assert client.responses.calls == 10
+
+
+def test_torn_journal_tail_resumes_without_retrying_a_failure(tmp_path: Path) -> None:
+    manifest = build_manifest(
+        scenario_ids=["S09"],
+        repeats=2,
+        model_id="gpt-test",
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=7,
+    )
+    seen = {"calls": 0}
+
+    class _Count:
+        def __init__(self) -> None:
+            self.inner = ScriptedAdapter("F000", ("get_metrics",))
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            seen["calls"] += 1
+            return await self.inner.complete(messages, tools, params)
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, _summary = _drive(first)
+    assert seen["calls"] == 8
+    journal = tmp_path / "trials.jsonl"
+    kept = journal.read_text(encoding="utf-8").splitlines()[0]
+    journal.write_text(kept + "\n" + '{"trial_id":', encoding="utf-8", newline="\n")
+    first_pair = trials[0].pair_id  # type: ignore[attr-defined]
+    second_pair = trials[1].pair_id  # type: ignore[attr-defined]
+
+    async def resumed() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    again, _ignored = _drive(resumed)
+    assert seen["calls"] == 8
+    assert again[0].pair_id == first_pair  # type: ignore[index]
+    assert again[1].pair_id == second_pair  # type: ignore[index]
+    assert again[1].model_dump() == trials[1].model_dump()  # type: ignore[attr-defined]
+    assert [trial.trial_id for trial in again] == ["S09#0", "S09#1"]  # type: ignore[attr-defined]
+    stored = journal.read_text(encoding="utf-8")
+    assert '{"trial_id":' not in stored
+    assert stored.count("\n") == 2
+    assert stored.count('"trial_id":"S09#0"') == 1
+    assert stored.count('"trial_id":"S09#1"') == 1
+
+    failed = tmp_path / "failed"
+    failed_seen = {"calls": 0}
+
+    class _Stop:
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            del messages, tools, params
+            failed_seen["calls"] += 1
+            raise RuntimeError("provider stopped")
+
+    failed_manifest = build_manifest(
+        scenario_ids=["S09"],
+        repeats=1,
+        model_id="gpt-test",
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=7,
+    )
+
+    async def fail_once() -> object:
+        return await execute_experiment(
+            failed_manifest,
+            failed,
+            _Stop(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    failed_trials, _failed_summary = _drive(fail_once)
+    assert failed_trials[0].empirical_eligible is False  # type: ignore[attr-defined]
+    assert failed_seen["calls"] == 1
+
+    async def fail_again() -> object:
+        return await execute_experiment(
+            failed_manifest,
+            failed,
+            _Stop(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    _drive(fail_again)
+    assert failed_seen["calls"] == 1
+    other = build_manifest(
+        scenario_ids=["S01"],
+        repeats=1,
+        model_id="gpt-test",
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=7,
+    )
+
+    async def mismatched() -> object:
+        return await execute_experiment(
+            other,
+            failed,
+            _Stop(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    with pytest.raises(ValueError, match="different manifest"):
+        _drive(mismatched)
+    assert failed_seen["calls"] == 1
+
+
+def test_orphan_traces_do_not_duplicate_usage_or_trial_ids(tmp_path: Path) -> None:
+    from parallax.trace import append_trace, read_traces
+
+    manifest = _s09_manifest()
+    client = _Client(_Responses(usage=True))
+    adapter = OpenAIAdapter(client, model=PARAMS_MODEL)
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            adapter,
+            provider_executed="openai",
+            resume=False,
+        )
+
+    trials, summary = _drive(first)
+    calls = client.responses.calls
+    assert summary.usage_deduped == {"input_tokens": 12, "output_tokens": 8}  # type: ignore[attr-defined]
+    assert summary.model_calls_unique == 4  # type: ignore[attr-defined]
+    original = trials[0].model_dump()  # type: ignore[attr-defined]
+    journal = tmp_path / "trials.jsonl"
+    journal.unlink()
+    traces = read_traces(tmp_path / "traces.jsonl")
+    traces_path = tmp_path / "traces.jsonl"
+    kept = traces_path.read_text(encoding="utf-8").splitlines()[0]
+    traces_path.write_text(kept + "\n", encoding="utf-8", newline="\n")
+    orphan = traces[0].model_copy(
+        update={
+            "run_id": "orphan-run",
+            "pair_id": "orphan-pair",
+            "provider_response_ids": ["resp_orphan"],
+            "usage": {"input_tokens": 100, "output_tokens": 100},
+        }
+    )
+    append_trace(traces_path, orphan)
+    commit = (tmp_path / "commits.jsonl").read_text(encoding="utf-8")
+    duplicate = json.loads(commit.splitlines()[0])
+    duplicate["pair_id"] = "second-pair"
+    duplicate["accounting"]["unique_model_calls"] = 99
+    duplicate["accounting"]["deduped_usage"] = {"input_tokens": 100, "output_tokens": 100}
+    with (tmp_path / "commits.jsonl").open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(duplicate) + "\n")
+
+    async def resumed() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            adapter,
+            provider_executed="openai",
+            resume=True,
+        )
+
+    restored, restored_summary = _drive(resumed)
+    assert client.responses.calls == calls
+    assert len(restored) == 1  # type: ignore[arg-type]
+    restored_dump = restored[0].model_dump()  # type: ignore[index]
+    assert restored_dump["trace_evidence"] == "partial"
+    assert restored_dump["pair_id"] == original["pair_id"]
+    assert restored_dump["accounting"] == original["accounting"]
+    assert restored_dump["arms"] == original["arms"]
+    assert restored_summary.usage_deduped == {"input_tokens": 12, "output_tokens": 8}  # type: ignore[attr-defined]
+    assert restored_summary.model_calls_unique == 4  # type: ignore[attr-defined]
+    assert restored_summary.trials == 1  # type: ignore[attr-defined]
+    rendered = restored_summary.model_dump_json()  # type: ignore[attr-defined]
+    assert "resp_orphan" not in rendered
+    assert journal.read_text(encoding="utf-8").count('"trial_id"') == 1
+    before = {row.name: (row.numerator, row.denominator) for row in summary.proportions}  # type: ignore[attr-defined]
+    after = {row.name: (row.numerator, row.denominator) for row in restored_summary.proportions}  # type: ignore[attr-defined]
+    assert after["trace_archive_incomplete"] == (1, 1)
+    assert before["h2_adaptation"][1] == 1
+    assert after["h2_adaptation"] == (0, 0)
+    assert after["pair_validity"] == (0, 1)
+    assert after["pair_completion"] == before["pair_completion"]
+
+
+def test_commit_without_traces_keeps_the_outcome_and_marks_the_archive(tmp_path: Path) -> None:
+    manifest = _s09_manifest()
+    seen = {"calls": 0}
+
+    class _Count:
+        def __init__(self) -> None:
+            self.inner = ScriptedAdapter("F000", ("get_metrics",))
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            seen["calls"] += 1
+            return await self.inner.complete(messages, tools, params)
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, summary = _drive(first)
+    assert trials[0].trace_evidence == "complete"  # type: ignore[attr-defined]
+    assert seen["calls"] == 4
+    before = {row.name: (row.numerator, row.denominator) for row in summary.proportions}  # type: ignore[attr-defined]
+    commit_bytes = (tmp_path / "commits.jsonl").read_bytes()
+    outcome = trials[0].model_dump()  # type: ignore[attr-defined]
+    (tmp_path / "trials.jsonl").unlink()
+    (tmp_path / "traces.jsonl").unlink()
+    historical = tmp_path / "historical"
+    historical.mkdir()
+    sentinel = historical / "trials.jsonl"
+    sentinel.write_bytes(b'{"historical":true}\n')
+    historical_bytes = sentinel.read_bytes()
+
+    async def resumed() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    restored, restored_summary = _drive(resumed)
+    assert seen["calls"] == 4
+    assert not (tmp_path / "traces.jsonl").exists()
+    assert (tmp_path / "commits.jsonl").read_bytes() == commit_bytes
+    assert sentinel.read_bytes() == historical_bytes
+    restored_dump = restored[0].model_dump()  # type: ignore[index]
+    assert restored_dump["trace_evidence"] == "missing"
+    for key in ("pair_id", "accounting", "arms", "empirical_eligible", "failure_reasons"):
+        assert restored_dump[key] == outcome[key]
+    after = {row.name: (row.numerator, row.denominator) for row in restored_summary.proportions}  # type: ignore[attr-defined]
+    assert after["pair_completion"] == before["pair_completion"]
+    assert after["h2_adaptation"] == before["h2_adaptation"]
+    assert after["trace_archive_incomplete"] == (1, 1)
+    assert restored_summary.trials == 1  # type: ignore[attr-defined]
+
+
+def test_partial_traces_after_a_commit_are_not_reconstructed(tmp_path: Path) -> None:
+    manifest = _s09_manifest()
+    seen = {"calls": 0}
+
+    class _Count:
+        def __init__(self) -> None:
+            self.inner = ScriptedAdapter("F000", ("get_metrics",))
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            seen["calls"] += 1
+            return await self.inner.complete(messages, tools, params)
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, _summary = _drive(first)
+    assert seen["calls"] == 4
+    outcome = trials[0].model_dump()  # type: ignore[attr-defined]
+    commit_bytes = (tmp_path / "commits.jsonl").read_bytes()
+    trace_path = tmp_path / "traces.jsonl"
+    partial = trace_path.read_text(encoding="utf-8").splitlines()[0] + "\n"
+    (tmp_path / "trials.jsonl").unlink()
+    trace_path.write_text(partial, encoding="utf-8", newline="\n")
+    historical = tmp_path / "historical-partial"
+    historical.mkdir()
+    sentinel = historical / "manifest.json"
+    sentinel.write_bytes(b'{"historical":"partial"}\n')
+    historical_bytes = sentinel.read_bytes()
+
+    async def resumed() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    restored, restored_summary = _drive(resumed)
+    assert seen["calls"] == 4
+    assert trace_path.read_text(encoding="utf-8") == partial
+    assert (tmp_path / "commits.jsonl").read_bytes() == commit_bytes
+    assert sentinel.read_bytes() == historical_bytes
+    restored_dump = restored[0].model_dump()  # type: ignore[index]
+    assert restored_dump["trace_evidence"] == "partial"
+    for key in ("pair_id", "accounting", "arms", "empirical_eligible"):
+        assert restored_dump[key] == outcome[key]
+    rates = {row.name: (row.numerator, row.denominator) for row in restored_summary.proportions}  # type: ignore[attr-defined]
+    assert rates["trace_archive_incomplete"] == (1, 1)
+    assert rates["pair_completion"] == (1, 1)
+    assert restored_summary.trials == 1  # type: ignore[attr-defined]
+
+
+def test_partial_trace_without_a_commit_runs_once(tmp_path: Path) -> None:
+    manifest = _s09_manifest()
+    seen = {"calls": 0}
+
+    class _Count:
+        def __init__(self) -> None:
+            self.inner = ScriptedAdapter("F000", ("get_metrics",))
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            seen["calls"] += 1
+            return await self.inner.complete(messages, tools, params)
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, _summary = _drive(first)
+    original_pair = trials[0].pair_id  # type: ignore[attr-defined]
+    assert seen["calls"] == 4
+    (tmp_path / "commits.jsonl").unlink()
+    (tmp_path / "trials.jsonl").unlink()
+    trace_path = tmp_path / "traces.jsonl"
+    first_line = trace_path.read_text(encoding="utf-8").splitlines()[0]
+    trace_path.write_text(first_line + "\n", encoding="utf-8", newline="\n")
+
+    async def resumed() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            _Count(),
+            provider_executed="scripted",
+            resume=True,
+        )
+
+    restored, restored_summary = _drive(resumed)
+    assert seen["calls"] == 8
+    assert len(restored) == 1  # type: ignore[arg-type]
+    assert restored[0].pair_id != original_pair  # type: ignore[index]
+    assert restored_summary.trials == 1  # type: ignore[attr-defined]
+    journal = (tmp_path / "trials.jsonl").read_text(encoding="utf-8")
+    assert journal.count('"trial_id"') == 1
+    assert original_pair not in journal
+
+
+def test_later_commit_crash_keeps_history_and_skips_the_provider(tmp_path: Path) -> None:
+    import shutil
+
+    manifest = build_manifest(
+        scenario_ids=["S09"],
+        repeats=2,
+        model_id="gpt-test",
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=7,
+    )
+    seen = {"calls": 0}
+
+    class _Count:
+        def __init__(self) -> None:
+            self.inner = ScriptedAdapter("F000", ("get_metrics",))
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            seen["calls"] += 1
+            return await self.inner.complete(messages, tools, params)
+
+    source = tmp_path / "source"
+
+    async def first() -> object:
+        return await execute_experiment(
+            manifest,
+            source,
+            _Count(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, summary = _drive(first)
+    assert seen["calls"] == 8
+    trace_lines = (source / "traces.jsonl").read_text(encoding="utf-8").splitlines()
+    journal_lines = (source / "trials.jsonl").read_text(encoding="utf-8").splitlines()
+    assert len(trace_lines) == 6
+    assert len(journal_lines) == 2
+    commit_bytes = (source / "commits.jsonl").read_bytes()
+    manifest_bytes = (source / "manifest.json").read_bytes()
+    historical = tmp_path / "historical-experiment"
+    historical.mkdir()
+    sentinel = historical / "trials.jsonl"
+    sentinel.write_bytes(b'{"historical":true}\n')
+    calls_before = summary.model_calls_cumulative  # type: ignore[attr-defined]
+    usage_before = summary.usage_deduped  # type: ignore[attr-defined]
+    finished = [trial.model_dump() for trial in trials]  # type: ignore[attr-defined]
+
+    def resume_from(name: str, keep_traces: int, evidence: str) -> None:
+        dest = tmp_path / name
+        shutil.copytree(source, dest)
+        journal = dest / "trials.jsonl"
+        journal.write_text(journal_lines[0] + "\n", encoding="utf-8", newline="\n")
+        kept = "".join(f"{line}\n" for line in trace_lines[:keep_traces])
+        trace_path = dest / "traces.jsonl"
+        trace_path.write_text(kept, encoding="utf-8", newline="\n")
+
+        async def resumed() -> object:
+            return await execute_experiment(
+                manifest,
+                dest,
+                _Count(),
+                provider_executed="scripted",
+                resume=True,
+            )
+
+        restored, restored_summary = _drive(resumed)
+        assert seen["calls"] == 8
+        assert (dest / "commits.jsonl").read_bytes() == commit_bytes
+        assert (dest / "manifest.json").read_bytes() == manifest_bytes
+        assert sentinel.read_bytes() == b'{"historical":true}\n'
+        assert trace_path.read_text(encoding="utf-8") == kept
+        stored = journal.read_text(encoding="utf-8").splitlines()
+        assert stored[0] == journal_lines[0]
+        assert [row.trial_id for row in restored] == ["S09#0", "S09#1"]  # type: ignore[attr-defined]
+        assert restored[0].model_dump() == finished[0]  # type: ignore[index]
+        recovered = restored[1].model_dump()  # type: ignore[index]
+        expected = dict(finished[1])
+        expected["trace_evidence"] = evidence
+        assert recovered == expected
+        assert restored_summary.trials == 2  # type: ignore[attr-defined]
+        assert restored_summary.model_calls_cumulative == calls_before  # type: ignore[attr-defined]
+        assert restored_summary.usage_deduped == usage_before  # type: ignore[attr-defined]
+        rates = {
+            row.name: (row.numerator, row.denominator)
+            for row in restored_summary.proportions  # type: ignore[attr-defined]
+        }
+        assert rates["pair_completion"] == (2, 2)
+        assert rates["h2_adaptation"] == (0, 0)
+        incomplete = 0 if evidence == "complete" else 1
+        assert rates["trace_archive_incomplete"] == (incomplete, 2)
+
+    resume_from("after-commit", 3, "missing")
+    resume_from("partial-traces", 4, "partial")
+    resume_from("traces-complete", 6, "complete")
+
+
+def test_protocol_slots_capture_five_independent_checkpoints(tmp_path: Path) -> None:
+    manifest = protocol_pilot_manifest(
+        model_id=PARAMS_MODEL,
+        model_call_budget=4,
+        tool_call_budget=6,
+        pair_model_call_budget=10,
+    )
+    assert manifest.worst_case_model_requests == 150
+    assert len(schedule(manifest)) == 15
+
+    class _Distinct:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def complete(self, messages: object, tools: object, params: object) -> ModelCompletion:
+            del tools, params
+            self.calls += 1
+            incident = "F000"
+            for message in messages:  # type: ignore[attr-defined]
+                if message.role == "user" and "incident " in message.content:
+                    incident = message.content.split("incident ", 1)[1].split(".", 1)[0]
+            seen = [message.tool_name for message in messages if message.role == "tool"]  # type: ignore[attr-defined]
+            response_id = f"resp-{self.calls}"
+            for name in ("get_metrics", "get_logs", "get_deployment"):
+                if name not in seen:
+                    return ModelCompletion(
+                        content="",
+                        tool_calls=(ToolRequest(name=name, arguments={"incident_id": incident}),),
+                        response_id=response_id,
+                    )
+            return ModelCompletion(content=SCRIPTED_DECISION, response_id=response_id)
+
+    adapter = _Distinct()
+
+    async def run() -> object:
+        return await execute_experiment(
+            manifest,
+            tmp_path,
+            adapter,
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    trials, _summary = _drive(run)
+    assert len(trials) == 15  # type: ignore[arg-type]
+    assert adapter.calls > 15
+    pair_ids = [trial.pair_id for trial in trials]  # type: ignore[attr-defined]
+    assert len(set(pair_ids)) == 15
+    seen_ids: set[str] = set()
+    by_scenario: dict[str, list[str]] = {}
+    for trial in trials:  # type: ignore[attr-defined]
+        arms = {arm.arm: arm for arm in trial.arms}
+        factual = arms["factual_replay"]
+        mutant = arms["mutant"]
+        assert factual.prefix_sha256 == mutant.prefix_sha256
+        assert factual.prefix_sha256
+        shared = (
+            set(arms["baseline"].provider_response_ids)
+            & set(factual.provider_response_ids)
+            & set(mutant.provider_response_ids)
+        )
+        assert shared
+        assert shared.isdisjoint(seen_ids)
+        seen_ids.update(arms["baseline"].provider_response_ids)
+        seen_ids.update(factual.provider_response_ids)
+        seen_ids.update(mutant.provider_response_ids)
+        by_scenario.setdefault(trial.scenario_id, []).append(trial.pair_id)
+    assert sorted(by_scenario) == ["S01", "S11", "S19"]
+    assert all(len(set(pair_ids)) == 5 for pair_ids in by_scenario.values())
+
+
+def test_protocol_pilot_refuses_a_budget_above_the_request_ceiling(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("parallax.openai_adapter.load_project_env", lambda: False)
+    monkeypatch.setenv("PARALLAX_MODEL", PARAMS_MODEL)
+    monkeypatch.setenv("PARALLAX_MAX_MODEL_CALLS", "5")
+    monkeypatch.setenv("PARALLAX_MAX_TOOL_CALLS", "6")
+
+    def boom(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise AssertionError("provider client constructed")
+
+    monkeypatch.setattr("parallax.openai_adapter.OpenAIAdapter.from_env", boom)
+    assert main(["--protocol-pilot", "--dry-run"]) == 2
+    captured = capsys.readouterr()
+    assert "protocol-pilot request ceiling is 150" in captured.err
+    assert "worst_case_model_requests=195" in captured.out
+    assert main(["--protocol-pilot", "--live"]) == 2
+    assert "provider client constructed" not in capsys.readouterr().err
+    manifest = protocol_pilot_manifest(
+        model_id=PARAMS_MODEL,
+        model_call_budget=5,
+        tool_call_budget=6,
+        pair_model_call_budget=13,
+    )
+
+    async def refused() -> object:
+        return await execute_experiment(
+            manifest,
+            Path("unused"),
+            object(),
+            provider_executed="scripted",
+            resume=False,
+        )
+
+    with pytest.raises(ValueError, match="150"):
+        _drive(refused)
+
+
+def test_pilot_and_exploratory_rates_are_not_pooled() -> None:
+    pilot = _trial("H1", "S01", decision="MONITOR", oracle="MONITOR", repeat=0, phase="pilot")
+    exploratory = _trial(
+        "H1",
+        "S01",
+        decision="ESCALATE",
+        oracle="MONITOR",
+        repeat=1,
+        phase="exploratory",
+    )
+    summary = summarize("exp-mixed", [pilot, exploratory])
+    rates = {row.name: (row.numerator, row.denominator) for row in summary.proportions}
+    assert rates["h1_invariance"] == (0, 0)
+    assert summary.usage_deduped is None
+    assert summary.usage_cumulative is None
+    assert summary.model_calls_unique == 0
+    assert "not pooled" in " ".join(summary.notes)
+    pilot_rates = {
+        row.name: (row.numerator, row.denominator) for row in summary.phase_ledgers["pilot"].proportions
+    }
+    exploratory_rates = {
+        row.name: (row.numerator, row.denominator)
+        for row in summary.phase_ledgers["exploratory"].proportions
+    }
+    assert pilot_rates["h1_invariance"] == (1, 1)
+    assert exploratory_rates["h1_invariance"] == (0, 1)
+    assert summary.phase_ledgers["pilot"].usage_deduped == {"input_tokens": 1, "output_tokens": 1}
+    assert summary.phase_ledgers["exploratory"].usage_deduped == {"input_tokens": 1, "output_tokens": 1}
+    printed = format_summary(summary)
+    assert "phase pilot not_pooled" in printed
+    assert "phase exploratory not_pooled" in printed
+    assert "phase pilot h1_invariance 1/1" in printed
+    assert "phase exploratory h1_invariance 0/1" in printed
+
+
+def test_protocol_pilot_branches_keep_the_prefix_and_hide_the_oracle() -> None:
+    from parallax.capture import sha256_text
+    from parallax.mutate import H3_IGNORE_POLICY
+    from parallax.prompt import POLICY
+
+    runs = {scenario.scenario_id: _drive_pair(scenario) for scenario in protocol_pilot_scenarios()}
+    latency = runs["S01"]
+    sensitivity = runs["S11"]
+    trust = runs["S19"]
+    for run in (latency, sensitivity, trust):
+        assert run.factual is not None
+        assert run.prefix_sha256 is not None
+        assert run.factual.prefix_sha256 == run.prefix_sha256
+        assert run.mutant.prefix_sha256 == run.prefix_sha256
+        assert run.factual.observation_original == run.mutant.observation_original
+        assert run.mutant.observation_mutated not in {None, run.mutant.observation_original}
+        assert run.factual_messages is not None and run.mutant_messages is not None
+        assert run.factual_messages[0].content == POLICY
+        assert run.mutant_messages[0].content == POLICY
+        visible = "\n".join(message.content for message in run.mutant_messages)
+        assert "oracle_decision" not in visible
+        assert "expected_decision" not in visible
+        assert "declared_oracle" not in visible
+        factual_hash = sha256_text(run.factual.observation_original or "")
+        mutant_hash = sha256_text(run.mutant.observation_mutated or "")
+        assert factual_hash != mutant_hash
+        assert factual_hash in {call.model_visible_sha256 for call in run.factual.tool_calls}
+        assert mutant_hash in {call.model_visible_sha256 for call in run.mutant.tool_calls}
+
+    assert latency.factual.oracle_decision == latency.mutant.oracle_decision == "MONITOR"
+    assert sensitivity.factual.oracle_decision == "INVESTIGATE"
+    assert sensitivity.mutant.oracle_decision == "MONITOR"
+    assert sensitivity.factual.predicate_m is True
+    assert sensitivity.mutant.predicate_m is False
+    before = json.loads(sensitivity.factual.observation_original or "")
+    after = json.loads(sensitivity.mutant.observation_mutated or "")
+    assert before["error_rate_bps"] == 500
+    assert after["error_rate_bps"] == 499
+    assert trust.factual.oracle_decision == trust.mutant.oracle_decision == "INVESTIGATE"
+    assert H3_IGNORE_POLICY not in (trust.factual.observation_original or "")
+    assert H3_IGNORE_POLICY in (trust.mutant.observation_mutated or "")
+    assert trust.mutant.incident_id == "F010"
+    assert sensitivity.mutant.incident_id == "F100"
+
+
+def test_shared_response_ids_are_counted_once_and_usage_stays_null() -> None:
+    left = _trial("H2", "S09", decision="INVESTIGATE", oracle="INVESTIGATE")
+    right = left.model_copy(update={"trial_id": "S09#8", "repeat_index": 8})
+    summary = summarize("exp-overlap", [left, right])
+    assert summary.model_calls_unique == 1
+    assert summary.model_calls_cumulative == 4
+    assert summary.usage_deduped is None
+    assert summary.latency_ms_deduped is None
+    assert summary.usage_cumulative == {"input_tokens": 4, "output_tokens": 4}
 
 
 def test_mini_pilot_edits_are_visible_hashed_and_keep_the_policy() -> None:

@@ -52,17 +52,29 @@ def resolve_h2_scenario(scenario_id: str | None) -> Scenario:
     raise ValueError(f"unknown scenario: {selected}")
 
 
-def max_model_requests(per_branch: int, total: int) -> int:
-    """Upper bound when the fork happens on the first model call.
+def full_pair_request_ceiling(per_branch: int) -> int:
+    """Most model calls one pair can make.
 
-    ``run_pair`` copies ``steps_used``, so each arm keeps the remaining
-    per-branch budget. The total cap can only make this smaller.
+    The baseline may use the whole per-branch budget. The checkpoint
+    copy keeps ``steps_used``, so after a fork on the first call each
+    replay has ``per_branch - 1`` calls left. A later fork leaves less.
+    """
+
+    if per_branch < 1:
+        return 0
+    return per_branch + 2 * (per_branch - 1)
+
+
+def max_model_requests(per_branch: int, total: int) -> int:
+    """Smaller of the requested total and the earliest-fork ceiling.
+
+    The total cap can only make this smaller. It does not raise the
+    per-branch ceiling.
     """
 
     if per_branch < 1 or total < 1:
         return 0
-    earliest_fork = 1 + 2 * (per_branch - 1)
-    return min(total, earliest_fork)
+    return min(total, full_pair_request_ceiling(per_branch))
 
 
 def pair_model_params(model: str) -> dict[str, Any]:
