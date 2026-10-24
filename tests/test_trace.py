@@ -77,6 +77,18 @@ def test_append_writes_one_line_and_reads_it_back(tmp_path: Path) -> None:
     assert json.loads(text.splitlines()[0])["model_id"] == "fake"
 
 
+def test_torn_trace_tail_is_dropped_on_read(tmp_path: Path) -> None:
+    path = tmp_path / "traces.jsonl"
+    append_trace(path, _row())
+    with path.open("a", encoding="utf-8", newline="\n") as handle:
+        handle.write('{"torn":')
+    rows = read_traces(path)
+    assert [row.run_id for row in rows] == ["run-1"]
+    assert '{"torn":' not in path.read_text(encoding="utf-8")
+    append_trace(path, _row(run_id="run-2"))
+    assert [row.run_id for row in read_traces(path)] == ["run-1", "run-2"]
+
+
 def test_unparsed_row_cannot_carry_a_decision() -> None:
     with pytest.raises(ValidationError):
         _row(parse_ok=False, decision_parsed="MONITOR")

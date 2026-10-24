@@ -1,15 +1,24 @@
-"""Mini-pilot experiment runner.
+"""Research experiment runner.
 
 The default command is a dry run. ``--live`` is required before a
 provider client exists. Each slot reuses ``run_pair``. A slot whose
 trial id is already in the journal is not run again.
 
-S01, S09, and S17 on F000 are the mini-pilot. The protocol pilot is
-three fixtures at R=5. Scripted adapters can exercise the scheduler.
-Their rows stay out of the empirical rates.
+A finished slot is appended to ``commits.jsonl`` and flushed before its
+trace rows. The journal line is appended after those rows. Resume copies
+a commit that never reached the journal, so that slot is not executed
+again and its provider usage is not counted twice. Trace rows with no
+commit stay out of the journal. A restored journal line records whether
+the trace archive is complete, partial, or missing. Missing rows are not
+invented. Partial and missing archives stay out of hypothesis rates.
+
+S01, S09, and S17 on F000 are the mini-pilot. ``--protocol-pilot``
+selects the frozen three-fixture pilot at R=5. Scripted adapters can
+exercise the scheduler. Their rows stay out of the empirical rates.
 """
 
 import argparse
+import os
 import platform
 import sys
 from collections.abc import Sequence
@@ -25,7 +34,11 @@ from parallax.agent import ModelAdapter
 from parallax.capture import sha256_text
 from parallax.fixtures import get_fixture
 from parallax.live import configured_budget, os_environ
-from parallax.live_pair import max_model_requests, pair_model_params
+from parallax.live_pair import (
+    full_pair_request_ceiling,
+    max_model_requests,
+    pair_model_params,
+)
 from parallax.metrics import (
     ExperimentSummary,
     PairAccounting,
@@ -45,6 +58,8 @@ from parallax.trace import (
     TRACE_SCHEMA_VERSION,
     TraceRecord,
     append_trace,
+    drop_torn_jsonl_tail,
+    read_traces,
 )
 
 MANIFEST_SCHEMA_VERSION = 1
@@ -54,7 +69,16 @@ _DEFAULT_TOOL_CALLS = 6
 _DEFAULT_REPEATS = 1
 _FAMILIES = ("H1", "H2", "H3")
 _MINI_PILOT = ("S01", "S09", "S17")
-ScheduleName = Literal["mini-pilot", "custom"]
+_PROTOCOL_PILOT = ("S01", "S11", "S19")
+_PROTOCOL_REPEATS = 5
+_PROTOCOL_PLANNING_CALLS = 150
+_PROTOCOL_PLANNING_TOKENS = 330_000
+_PROTOCOL_BINDINGS = {
+    "S01": ("H1", "h1-latency", "F000", "MONITOR"),
+    "S11": ("H2", "h2-clear-error-rate", "F100", "MONITOR"),
+    "S19": ("H3", "h3-ignore-policy", "F010", "INVESTIGATE"),
+}
+ScheduleName = Literal["mini-pilot", "protocol-pilot", "custom"]
 _SECRET_MARKERS = ("sk-", "api_key", "bearer ", "authorization")
 _LABEL_TOKENS = (
     "oracle_decision",
@@ -125,6 +149,31 @@ def pilot_scenarios() -> tuple[Scenario, Scenario, Scenario]:
     return (found["H1"], found["H2"], found["H3"])
 
 
+def protocol_pilot_scenarios() -> tuple[Scenario, Scenario, Scenario]:
+    """Frozen pilot rows. One family each, on three declared fixtures.
+
+    The protocol fixes the shape and does not name the scenario ids.
+    These ids are the first row of each family on F000, F100, and F010.
+    A change to those bindings raises here instead of following it.
+    """
+
+    selected: list[Scenario] = []
+    for scenario_id in _PROTOCOL_PILOT:
+        scenario = scenario_by_id(scenario_id)
+        actual = (
+            scenario.family,
+            scenario.intervention_id,
+            scenario.fixture_id,
+            scenario.oracle_after,
+        )
+        if actual != _PROTOCOL_BINDINGS[scenario_id]:
+            raise ValueError(f"protocol pilot binding changed for {scenario_id}")
+        selected.append(scenario)
+    if len({scenario.fixture_id for scenario in selected}) != len(selected):
+        raise ValueError("protocol pilot fixtures must be distinct")
+    return (selected[0], selected[1], selected[2])
+
+
 def scenario_by_id(scenario_id: str) -> Scenario:
     """Return one declared scenario."""
 
@@ -174,7 +223,7 @@ def build_manifest(
     hypotheses = [family for family in _FAMILIES if any(row.family == family for row in selected)]
     enforced = max_model_requests(model_call_budget, pair_model_call_budget)
     slots = len(selected) * repeats
-    schedule_name = _schedule_name(scenario_ids)
+    schedule_name = _schedule_name(scenario_ids, repeats)
     bindings = [_binding(scenario) for scenario in selected]
     identity = {
         "fixture_hashes": fixture_hashes,
@@ -209,6 +258,19 @@ def build_manifest(
             "Schedule label: mini-pilot. Scenarios S01, S09, and S17 on fixture F000. "
             "The protocol pilot uses three fixtures and R=5."
         )
+    if schedule_name == "protocol-pilot":
+        notes.append(
+            "Schedule label: protocol-pilot. Frozen bindings S01/h1-latency/F000, "
+            "S11/h2-clear-error-rate/F100, and S19/h3-ignore-policy/F010. "
+            "Each of the five repeats is a fresh pair. Checkpoints are not shared across repeats."
+        )
+        notes.append(
+            "Protocol document ceiling for this shape: 15 baselines, 30 replays, "
+            f"{_PROTOCOL_PLANNING_CALLS} model calls, about {_PROTOCOL_PLANNING_TOKENS} tokens. "
+            "Dollar cost is not estimated."
+        )
+        if enforced * slots != _PROTOCOL_PLANNING_CALLS:
+            notes.append(f"This configuration enforces {enforced * slots} model requests.")
     return ExperimentManifest(
         schema_version=MANIFEST_SCHEMA_VERSION,
         experiment_id="exp-3a-" + sha256_text(canonical_json(identity))[:16],
@@ -237,6 +299,27 @@ def build_manifest(
         python_version=str(identity["python_version"]),
         trace_schema_version=TRACE_SCHEMA_VERSION,
         notes=notes,
+    )
+
+
+def protocol_pilot_manifest(
+    *,
+    model_id: str,
+    model_call_budget: int,
+    tool_call_budget: int,
+    pair_model_call_budget: int,
+) -> ExperimentManifest:
+    """Manifest for the frozen three-fixture pilot at R=5."""
+
+    scenarios = protocol_pilot_scenarios()
+    return build_manifest(
+        scenario_ids=[scenario.scenario_id for scenario in scenarios],
+        repeats=_PROTOCOL_REPEATS,
+        model_id=model_id,
+        model_call_budget=model_call_budget,
+        tool_call_budget=tool_call_budget,
+        pair_model_call_budget=pair_model_call_budget,
+        phase="pilot",
     )
 
 
@@ -316,6 +399,18 @@ def format_manifest(manifest: ExperimentManifest) -> str:
     ]
     if manifest.schedule == "mini-pilot":
         lines.append("mini-pilot: S01, S09, S17 on F000. Protocol pilot: three fixtures, R=5.")
+    if manifest.schedule == "protocol-pilot":
+        slots = len(manifest.scenario_ids) * manifest.repeats
+        lines.append(f"baseline_arms={slots}")
+        lines.append(f"factual_replays={slots}")
+        lines.append(f"mutant_replays={slots}")
+        lines.append(f"replay_arms={slots * 2}")
+        lines.append(f"protocol_planning_model_calls={_PROTOCOL_PLANNING_CALLS}")
+        lines.append(f"protocol_planning_token_ceiling={_PROTOCOL_PLANNING_TOKENS}")
+        lines.append("cost_usd=null")
+        lines.append(
+            "cost_assumption=documented call sizes in RESEARCH_PROTOCOL.md; no model price is recorded"
+        )
     return "\n".join(lines) + "\n"
 
 
@@ -330,6 +425,7 @@ def read_completed_trial_ids(path: Path) -> set[str]:
 
     if not path.is_file():
         return set()
+    drop_torn_jsonl_tail(path, TrialRecord.model_validate_json)
     found: set[str] = set()
     for line in path.read_text(encoding="utf-8").splitlines():
         if line:
@@ -418,27 +514,32 @@ async def execute_experiment(
 ) -> tuple[list[TrialRecord], ExperimentSummary]:
     """Run the remaining slots. Completed trial ids are not repeated."""
 
+    _enforce_protocol_ceiling(manifest)
     output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = output_dir / "manifest.json"
     _store_manifest(manifest_path, manifest)
     trial_path = output_dir / "trials.jsonl"
+    commit_path = output_dir / "commits.jsonl"
     trace_path = output_dir / "traces.jsonl"
-    completed = read_completed_trial_ids(trial_path)
+    written = reconcile_commits(commit_path, trial_path, trace_path)
+    completed = {row.trial_id for row in written}
     if completed and not resume:
         raise ValueError("experiment journal exists; pass --resume to continue")
-    written = list(_read_trials(trial_path))
     for slot in schedule(manifest):
         if slot.trial_id in completed:
             continue
-        record = await _run_slot(
+        record, run = await _run_slot(
             manifest,
             slot,
             adapter,
             provider_executed=provider_executed,
-            trace_path=trace_path,
         )
-        append_trial(trial_path, record)
-        written.append(record)
+        append_trial(commit_path, record)
+        if run is not None:
+            _write_traces(trace_path, run, manifest.experiment_id)
+        marked = record.model_copy(update={"trace_evidence": _trace_evidence(trace_path, record)})
+        append_trial(trial_path, marked)
+        written.append(marked)
         completed.add(record.trial_id)
         _write_summary(output_dir / "summary.json", summarize(manifest.experiment_id, written))
     summary = summarize(manifest.experiment_id, written)
@@ -447,15 +548,81 @@ async def execute_experiment(
 
 
 def append_trial(path: Path, record: TrialRecord) -> None:
-    """Append one trial journal line."""
+    """Append one trial line. A trial id already in the file is left untouched."""
 
     line = record.model_dump_json()
     if "\n" in line or "\r" in line:
         raise ValueError("trial record must serialize to one line")
     path.parent.mkdir(parents=True, exist_ok=True)
+    drop_torn_jsonl_tail(path, TrialRecord.model_validate_json)
+    if record.trial_id in read_completed_trial_ids(path):
+        return
+    _append_line(path, line)
+
+
+def reconcile_commits(commit_path: Path, trial_path: Path, trace_path: Path) -> list[TrialRecord]:
+    """Copy commits that have no journal line.
+
+    The first commit for a trial id wins. A later commit for that same id
+    is not journaled, so a duplicate execution cannot add a second total.
+    Existing journal lines are not rewritten. The copied line keeps the
+    committed outcome and records the trace archive that is actually on disk.
+    """
+
+    journaled = _read_trials(trial_path)
+    seen = {row.trial_id for row in journaled}
+    traces = read_traces(trace_path)
+    for record in _read_trials(commit_path):
+        if record.trial_id in seen:
+            continue
+        marked = record.model_copy(update={"trace_evidence": _trace_evidence_rows(record, traces)})
+        append_trial(trial_path, marked)
+        journaled.append(marked)
+        seen.add(record.trial_id)
+    return journaled
+
+
+def _trace_evidence(trace_path: Path, record: TrialRecord) -> Literal["complete", "partial", "missing"]:
+    return _trace_evidence_rows(record, read_traces(trace_path))
+
+
+def _trace_evidence_rows(
+    record: TrialRecord,
+    traces: Sequence[TraceRecord],
+) -> Literal["complete", "partial", "missing"]:
+    """Classify the archive for one committed pair. This does not invent rows."""
+
+    expected = {arm.arm for arm in record.arms}
+    if record.pair_id is None or not expected:
+        return "missing"
+    present = {
+        row.arm
+        for row in traces
+        if row.pair_id == record.pair_id and row.experiment_id == record.experiment_id
+    }
+    if not present:
+        return "missing"
+    if expected <= present:
+        return "complete"
+    return "partial"
+
+
+def _enforce_protocol_ceiling(manifest: ExperimentManifest) -> None:
+    """Stop a protocol pilot whose request budget exceeds the frozen ceiling."""
+
+    if manifest.schedule != "protocol-pilot":
+        return
+    if manifest.worst_case_model_requests > _PROTOCOL_PLANNING_CALLS:
+        raise ValueError("protocol-pilot request ceiling is 150")
+    if manifest.enforced_pair_model_calls > 10:
+        raise ValueError("protocol-pilot pair request ceiling is 10")
+
+
+def _append_line(path: Path, line: str) -> None:
     with path.open("a", encoding="utf-8", newline="\n") as handle:
         handle.write(line + "\n")
         handle.flush()
+        os.fsync(handle.fileno())
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -465,8 +632,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--protocol-pilot", action="store_true")
     parser.add_argument("--scenarios", nargs="+", metavar="SCENARIO_ID", default=None)
-    parser.add_argument("--repeats", type=int, default=_DEFAULT_REPEATS)
+    parser.add_argument("--repeats", type=int, default=None)
     parser.add_argument("--model-calls", type=int, default=None)
     parser.add_argument("--tool-calls", type=int, default=None)
     parser.add_argument("--pair-model-calls", type=int, default=None)
@@ -483,6 +651,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.live and not model_id:
         print("PARALLAX_MODEL is not set", file=sys.stderr)
         return 2
+    if args.protocol_pilot and args.scenarios is not None:
+        print("protocol-pilot uses its own frozen scenarios", file=sys.stderr)
+        return 2
+    if args.protocol_pilot and args.repeats not in (None, _PROTOCOL_REPEATS):
+        print("protocol-pilot repeats are fixed at 5", file=sys.stderr)
+        return 2
+    repeats = _PROTOCOL_REPEATS if args.protocol_pilot else _DEFAULT_REPEATS
+    if args.repeats is not None:
+        repeats = args.repeats
     try:
         model_calls = configured_budget(
             args.model_calls, environ, "PARALLAX_MAX_MODEL_CALLS", _DEFAULT_MODEL_CALLS
@@ -492,19 +669,24 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         pair_calls = args.pair_model_calls
         if pair_calls is None:
-            pair_calls = max_model_requests(model_calls, 2 * model_calls - 1)
+            requested = 2 * model_calls - 1
+            if args.protocol_pilot:
+                requested = full_pair_request_ceiling(model_calls)
+            pair_calls = max_model_requests(model_calls, requested)
         manifest_args = {
-            "repeats": args.repeats,
             "model_id": model_id or "(unset)",
             "model_call_budget": model_calls,
             "tool_call_budget": tool_calls,
             "pair_model_call_budget": pair_calls,
         }
-        if args.scenarios is None:
-            manifest = pilot_manifest(**manifest_args)
+        if args.protocol_pilot:
+            manifest = protocol_pilot_manifest(**manifest_args)
+        elif args.scenarios is None:
+            manifest = pilot_manifest(repeats=repeats, **manifest_args)
         else:
             manifest = build_manifest(
                 scenario_ids=args.scenarios,
+                repeats=repeats,
                 phase="pilot",
                 **manifest_args,
             )
@@ -512,8 +694,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(_public_text(str(exc)), file=sys.stderr)
         return 2
     if not args.live:
+        try:
+            _enforce_protocol_ceiling(manifest)
+        except ValueError as exc:
+            sys.stdout.write(format_manifest(manifest))
+            print(_public_text(str(exc)), file=sys.stderr)
+            return 2
         sys.stdout.write(format_manifest(manifest))
         return 0
+    try:
+        _enforce_protocol_ceiling(manifest)
+    except ValueError as exc:
+        print(_public_text(str(exc)), file=sys.stderr)
+        return 2
     directory = args.output or experiment_directory(Path("."), manifest.experiment_id)
     try:
         from parallax.openai_adapter import OpenAIAdapter
@@ -557,8 +750,7 @@ async def _run_slot(
     adapter: ModelAdapter,
     *,
     provider_executed: Literal["openai", "scripted"],
-    trace_path: Path,
-) -> TrialRecord:
+) -> tuple[TrialRecord, PairRun | None]:
     scenario = slot.scenario
     try:
         run = _scrub_run(
@@ -578,8 +770,7 @@ async def _run_slot(
             )
         )
     except ValueError as exc:
-        return _failed_slot(manifest, slot, provider_executed, _public_text(str(exc)))
-    _write_traces(trace_path, run, manifest.experiment_id)
+        return _failed_slot(manifest, slot, provider_executed, _public_text(str(exc))), None
     reasons = eligibility_reasons(
         run,
         manifest=manifest,
@@ -607,7 +798,7 @@ async def _run_slot(
         failure_reasons=failure_reasons(run),
         arms=arms,
         accounting=accounting,
-    )
+    ), run
 
 
 def _failed_slot(
@@ -756,6 +947,7 @@ def _write_summary(path: Path, summary: ExperimentSummary) -> None:
 def _read_trials(path: Path) -> list[TrialRecord]:
     if not path.is_file():
         return []
+    drop_torn_jsonl_tail(path, TrialRecord.model_validate_json)
     return [
         TrialRecord.model_validate_json(line)
         for line in path.read_text(encoding="utf-8").splitlines()
@@ -763,9 +955,12 @@ def _read_trials(path: Path) -> list[TrialRecord]:
     ]
 
 
-def _schedule_name(scenario_ids: Sequence[str]) -> ScheduleName:
+def _schedule_name(scenario_ids: Sequence[str], repeats: int) -> ScheduleName:
     if tuple(scenario_ids) == _MINI_PILOT:
         return "mini-pilot"
+    if tuple(scenario_ids) == _PROTOCOL_PILOT and repeats == _PROTOCOL_REPEATS:
+        protocol_pilot_scenarios()
+        return "protocol-pilot"
     return "custom"
 
 
