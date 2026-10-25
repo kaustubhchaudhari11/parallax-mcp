@@ -210,8 +210,9 @@ tests/
   test_prompt_isolation.py
 ```
 
-Day 3 may add `app.py` for Streamlit. Streamlit is not a current
-dependency and will not be added before that milestone.
+The read-only comparison view is `streamlit_app.py`. Streamlit and
+Plotly are the optional `dashboard` extra. The agent loop does not
+import them.
 
 ## MCP data flow
 

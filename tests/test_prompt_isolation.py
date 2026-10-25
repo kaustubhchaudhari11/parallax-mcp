@@ -129,11 +129,12 @@ def test_loop_modules_do_not_import_labels_or_a_provider() -> None:
         modules = _imports(source / name)
         assert modules.isdisjoint(NETWORK_MODULES)
         assert "parallax.openai_adapter" not in modules
+        assert "parallax.dashboard" not in modules
         text = (source / name).read_text(encoding="utf-8").lower()
         assert "headroom" not in text
+        assert "streamlit" not in text
     project_text = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
     assert "headroom" not in project_text
-    assert "streamlit" not in project_text
     with (ROOT / "pyproject.toml").open("rb") as handle:
         document = tomllib.load(handle)
     project = document["project"]
@@ -143,6 +144,7 @@ def test_loop_modules_do_not_import_labels_or_a_provider() -> None:
     assert dev.isdisjoint(PROVIDER_PACKAGES)
     assert "openai" not in base
     extras = project["optional-dependencies"]
+    assert "dashboard" in extras
     for extra_name, requirements in extras.items():
         names = _requirement_names(requirements)
         if extra_name == "live":
@@ -150,4 +152,11 @@ def test_loop_modules_do_not_import_labels_or_a_provider() -> None:
             assert "python-dotenv" in names
             assert names.isdisjoint(PROVIDER_PACKAGES - {"openai"})
             continue
+        if extra_name == "dashboard":
+            assert "streamlit" in names
+            assert "plotly" in names
+            assert "openai" not in names
+            assert names.isdisjoint({"anthropic", "headroom"})
+            continue
         assert "openai" not in names
+        assert "streamlit" not in names
