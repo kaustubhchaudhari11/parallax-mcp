@@ -33,12 +33,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from parallax.agent import ModelAdapter
 from parallax.capture import sha256_text
 from parallax.fixtures import get_fixture
-from parallax.live import configured_budget, os_environ
-from parallax.live_pair import (
-    full_pair_request_ceiling,
-    max_model_requests,
-    pair_model_params,
-)
 from parallax.metrics import (
     ExperimentSummary,
     PairAccounting,
@@ -194,6 +188,10 @@ def build_manifest(
     phase: str = "pilot",
 ) -> ExperimentManifest:
     """Validate a research configuration and fingerprint its inputs."""
+
+    # live_pair imports the optional provider adapter. The dashboard loads
+    # this module to validate a manifest and must not import that adapter.
+    from parallax.live_pair import max_model_requests, pair_model_params
 
     if phase not in RESEARCH_PHASES:
         raise ValueError("research phase must be pilot or exploratory")
@@ -643,6 +641,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.live and args.dry_run:
         print("choose either --dry-run or --live", file=sys.stderr)
         return 2
+    from parallax.live import configured_budget, os_environ
+    from parallax.live_pair import full_pair_request_ceiling, max_model_requests
     from parallax.openai_adapter import load_project_env
 
     load_project_env()

@@ -24,12 +24,15 @@ Three hypotheses organize the edits.
 3. **Trust boundaries.** An instruction hidden in a tool result does not
    override the task policy.
 
-They are hypotheses. This repository has not tested them. No model has
-been called, and no experiment result exists.
+They are hypotheses. A protocol pilot, a Decision X-Ray search, and a
+three-arm control study have recorded results. The dashboard ships
+sanitized summaries of those runs. Raw traces stay local. The rates
+belong to one model configuration. They are not a general claim about
+agents or MCP.
 
 ## Status
 
-Day 1 is implemented. Milestone 2A replays a scripted adapter without a live model. An optional OpenAI adapter is covered by offline tests. Hypothesis rates and Day 3 are not implemented.
+Day 1 is implemented. Milestone 2A replays a scripted adapter without a live model. An optional OpenAI adapter is covered by offline tests. A protocol pilot, an X-Ray search, and a control study have sanitized summaries in the dashboard. The exploratory evaluation is not run.
 
 | Piece | State |
 | --- | --- |
@@ -37,9 +40,9 @@ Day 1 is implemented. Milestone 2A replays a scripted adapter without a live mod
 | Synthetic fixtures, decision oracle, MCP server, client tests | Implemented |
 | Canonical model-visible JSON | Implemented |
 | Deterministic mutation, snapshot replay, JSONL traces | Implemented, scripted adapter only |
-| Live model adapter and hypothesis rates | Optional `live` extra. Offline tests only. No live trial and no rates |
-| Experiment results | None |
-| Streamlit comparison view | Not implemented |
+| Live model adapter and hypothesis rates | Optional `live` extra. Protocol-pilot summary is bundled. Exploratory evaluation is not run |
+| Experiment results | Sanitized summaries in the dashboard catalog. Raw traces stay in gitignored `runs/` |
+| Streamlit comparison view | Read-only dashboard. It does not call a model |
 | Headroom | Not a dependency and not on the measurement path |
 
 The oracle is a Python function used by tests. It is not an MCP tool,
@@ -345,9 +348,34 @@ Novelty is not claimed.
 | pytest / Ruff | 9.1.1 / 0.17.1, dev dependency group |
 | Virtualenv creator | uv 0.13.2 |
 
-Streamlit, model SDKs, and Headroom are not dependencies.
+Streamlit and Plotly are the optional `dashboard` extra. They are not
+dependencies of the agent loop. Headroom is not a dependency.
 API keys belong in the environment, never in the repository.
 `.gitignore` excludes `.env`, `.venv`, and local `runs/`.
+
+## Dashboard
+
+The release view reads sanitized summaries. It does not call a model
+and does not need an API key.
+
+```powershell
+uv sync --extra dashboard
+uv run --extra dashboard streamlit run streamlit_app.py
+```
+
+Streamlit Community Cloud can deploy the same entry point:
+
+1. Use this repository and the `streamlit_app.py` file.
+2. Set the Python version to 3.12.
+3. Leave secrets empty. The app does not read `OPENAI_API_KEY`.
+4. The requirements file is `requirements.txt`.
+
+On a checkout that still has `runs/`, the sidebar can show that local
+directory. Cloud does not have `runs/`, so it shows the bundled release.
+The public release withholds checkpoint identifiers and directories that
+have no result summary. A local checkout can show those diagnostics.
+The dashboard does not show provider response identifiers, raw traces,
+or an arbitrary filesystem path, and it does not start a model request.
 
 ## Limitations
 
@@ -361,7 +389,7 @@ The protocol states these in full. The short form:
   still use those fields.
 - Trust tests will cover text inside tool results. They do not cover
   malicious servers or poisoned tool descriptions.
-- No result exists until a trace file exists.
+- Raw traces stay in local `runs/`. The dashboard publishes sanitized summaries of the recorded pilot, X-Ray search, and control study.
 
 ## License and credentials
 

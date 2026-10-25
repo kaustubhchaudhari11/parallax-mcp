@@ -23,8 +23,9 @@ runs/
 traces/
 *.jsonl
 
-# Day 3 dashboard local state. The app itself is not implemented yet.
-.streamlit/
+# Streamlit secrets and local state. The theme file is tracked.
+.streamlit/*
+!.streamlit/config.toml
 
 # OS and editor
 .DS_Store
