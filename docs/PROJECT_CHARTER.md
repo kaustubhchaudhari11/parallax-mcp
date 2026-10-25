@@ -1,9 +1,14 @@
 # PARALLAX Project Charter
 
+**Historical note, 25 October 2026.** This charter was written on
+21 October 2026, before the system existed. It is project history.
+The implementation is in [`ARCHITECTURE.md`](ARCHITECTURE.md). The
+recorded studies are summarized in the repository README and specified
+in [`RESEARCH_PROTOCOL.md`](RESEARCH_PROTOCOL.md). Nothing in the
+charter body is a measured result.
+
 **Status:** architecture review incorporated, 21 October 2026.
-No experimental system has been built. The repository contains a package
-scaffold whose console script prints a hello string. Nothing in this
-charter is a measured result.
+No experimental system had been built when this charter was written.
 
 **Name:** PARALLAX
 **Subtitle:** Counterfactual Reliability Testing for MCP Agents

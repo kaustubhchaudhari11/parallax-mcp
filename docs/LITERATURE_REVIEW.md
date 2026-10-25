@@ -1,15 +1,17 @@
 # PARALLAX Literature Review
 
+**Historical note, 25 October 2026.** This review was written on
+21 October 2026. It compares neighboring work. It does not report
+PARALLAX measurements, and it does not claim novelty. Figures below
+are the cited authors' results.
+
 **Status:** 21 October 2026.
 This review records sources that were opened and what they support.
 It does not claim that PARALLAX is novel. Several systems already replay
 agent trajectories, inject faults or prompts into tool channels, or test
 agents with metamorphic relations. The last section states the
-differences the prototype is being built to maintain. Those differences
+differences the prototype was being built to maintain. Those differences
 are design choices until an evaluation shows they matter.
-
-PARALLAX has produced no experimental numbers. Figures below are the
-cited authors' reported results, not results from this repository.
 
 ## How sources were checked
 

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PARALLAX — One number changed. So did the agent's decision.</title>
+  <meta name="description" content="PARALLAX tests how AI agents respond when the information they receive from tools changes.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#FAFAF7">
+  <!-- The Pages URL below is the intended host. It is not verified until a manual deploy from main succeeds. It is not linked in the page body. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PARALLAX">
+  <meta property="og:title" content="PARALLAX — One number changed. So did the agent's decision.">
+  <meta property="og:description" content="PARALLAX tests how AI agents respond when the information they receive from tools changes.">
+  <meta property="og:url" content="https://kaustubhchaudhari11.github.io/parallax-mcp/">
+  <meta property="og:image" content="https://kaustubhchaudhari11.github.io/parallax-mcp/assets/social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PARALLAX. One number changed. So did the agent's decision. Recorded F100 outcomes: 500 bps stayed INVESTIGATE, and 499 bps became MONITOR.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PARALLAX — One number changed. So did the agent's decision.">
+  <meta name="twitter:description" content="PARALLAX tests how AI agents respond when the information they receive from tools changes.">
+  <meta name="twitter:image" content="https://kaustubhchaudhari11.github.io/parallax-mcp/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="PARALLAX social card. 500 basis points stayed INVESTIGATE. 499 basis points became MONITOR.">
+  <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/brand/favicon.png" type="image/png" sizes="32x32">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body id="top" data-page="home">
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <img src="assets/brand/mark.svg" alt="" width="28" height="28">
+      PARALLAX
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="index.html" aria-current="page">Home</a>
+      <a href="research.html">Research</a>
+      <a href="method.html">How It Works</a>
+      <a href="try.html">Try PARALLAX</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <div class="wrap">
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">AI agent reliability research</p>
+          <h1 id="hero-title">One number changed.<br>So did the agent's decision.</h1>
+          <p class="lede">PARALLAX tests how AI agents respond when the information they receive from tools changes.</p>
+          <p class="support">Test your AI agents before you trust their decisions.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#xray">Explore the experiment</a>
+            <a class="btn" href="try.html">Try PARALLAX locally</a>
+          </div>
+        </div>
+        <figure class="pair">
+          <div class="pair-row">
+            <div class="pair-card">
+              <span>Factual, recorded</span>
+              <strong>500 bps</strong>
+              <em>INVESTIGATE</em>
+            </div>
+            <span class="pair-join" aria-hidden="true"><span class="arrow-wide">→</span><span class="arrow-narrow">↓</span></span>
+            <div class="pair-card pair-card-alt">
+              <span>One point lower</span>
+              <strong>499 bps</strong>
+              <em>MONITOR</em>
+            </div>
+          </div>
+          <figcaption>Recorded outcomes from the synthetic F100 experiment. At 501 bps the decision stayed INVESTIGATE.</figcaption>
+        </figure>
+      </section>
+      <p class="agent-strip">
+        <a href="method.html#agent-stack">Built for tool-using agents</a>
+        <span>MCP · LangGraph · CrewAI · Local BYOA</span>
+      </p>
+    </div>
+
+    <section class="section" id="why" aria-labelledby="why-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="why-title">Why does this matter?</h2>
+          <p class="measure">An agent can return the right label and still miss the evidence behind it. PARALLAX changes one tool observation and records what the decision does.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section band" id="steps" aria-labelledby="steps-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="steps-title">What PARALLAX does</h2>
+          <p>Three steps. One declared change.</p>
+        </div>
+        <ol class="steps">
+          <li class="step">
+            <p class="step-no">01</p>
+            <h3>Capture the evidence</h3>
+            <p>Save the tool response the agent actually received.</p>
+          </li>
+          <li class="step">
+            <p class="step-no">02</p>
+            <h3>Change one observation</h3>
+            <p>Edit one validated field. Keep the prompt and settings fixed.</p>
+          </li>
+          <li class="step">
+            <p class="step-no">03</p>
+            <h3>Compare the decisions</h3>
+            <p>Read both decisions against the rule for that experiment.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="section" id="xray" aria-labelledby="xray-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="xray-title">One experiment, two decisions</h2>
+          <p>Three recorded values. This page does not estimate any other rate. The full record is on the <a href="research.html#xray">research page</a>.</p>
+        </div>
+        <div class="instrument" data-instrument>
+          <div class="scale" role="radiogroup" aria-label="Recorded error rate in basis points">
+            <label class="node">
+              <input type="radio" name="recorded-bps" value="499">
+              <span class="tag">Counterfactual</span>
+              <span class="bps">499 bps</span>
+              <strong>MONITOR</strong>
+              <span class="note">Decision changed</span>
+            </label>
+            <label class="node">
+              <input type="radio" name="recorded-bps" value="500" checked>
+              <span class="tag">Factual</span>
+              <span class="bps">500 bps</span>
+              <strong>INVESTIGATE</strong>
+              <span class="note">Baseline</span>
+            </label>
+            <label class="node">
+              <input type="radio" name="recorded-bps" value="501">
+              <span class="tag">Counterfactual</span>
+              <span class="bps">501 bps</span>
+              <strong>INVESTIGATE</strong>
+              <span class="note">Decision held</span>
+            </label>
+          </div>
+          <article class="reading is-selected" data-reading="500">
+            <p class="tag">Recorded baseline</p>
+            <p class="decision-word">INVESTIGATE</p>
+            <p>The evidence is unchanged: <code>error_rate_bps</code> 500. Study <code>xray-547963e428ed516b</code>, synthetic fixture F100.</p>
+          </article>
+          <article class="reading" data-reading="499">
+            <p class="tag">Recorded change</p>
+            <p class="decision-word">INVESTIGATE → MONITOR</p>
+            <p>The edit changed 500 to 499. The recorded decision became MONITOR.</p>
+          </article>
+          <article class="reading" data-reading="501">
+            <p class="tag">Recorded hold</p>
+            <p class="decision-word">INVESTIGATE → INVESTIGATE</p>
+            <p>The edit changed 500 to 501. The recorded decision stayed INVESTIGATE.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section band" id="develop" aria-labelledby="develop-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="develop-title">Built for developers</h2>
+          <p>Test a compatible agent that already lives in a trusted copy of this repository.</p>
+        </div>
+        <div class="use-grid">
+          <article class="use">
+            <h3>LangGraph</h3>
+            <p>LangGraph resumes from a checkpoint after one evidence edit.</p>
+          </article>
+          <article class="use">
+            <h3>CrewAI</h3>
+            <p>CrewAI runs a fresh comparison. The two runs do not share a checkpoint.</p>
+          </article>
+        </div>
+        <p class="more"><a class="btn" href="try.html">See the local setup</a></p>
+      </div>
+    </section>
+
+    <section class="section" id="explore" aria-labelledby="explore-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="explore-title">Explore the research</h2>
+          <p>Three recorded studies. They are not one pooled result. The samples are small.</p>
+        </div>
+        <div class="card-grid">
+          <a class="card link-card" href="research.html#findings">
+            <p class="tag">Protocol pilot</p>
+            <p class="stat">15/15</p>
+            <p>Valid paired trials. H1, H2, and H3 are reported separately.</p>
+          </a>
+          <a class="card link-card" href="research.html#xray">
+            <p class="tag">Decision X-Ray</p>
+            <p class="stat">500 → 499</p>
+            <p>INVESTIGATE became MONITOR. 501 stayed INVESTIGATE.</p>
+          </a>
+          <a class="card link-card" href="research.html#findings">
+            <p class="tag">Controls</p>
+            <p class="stat">0/3 · 3/3 · 0/3</p>
+            <p>Null, intervention, and negative arms, kept apart from the pilot.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-bar">
+      <div class="footer-brand">
+        <p class="footer-name">PARALLAX</p>
+        <p class="footer-tagline">Same agent. Different evidence. Different future.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="research.html">Research</a>
+        <a href="method.html">How It Works</a>
+        <a href="https://github.com/kaustubhchaudhari11/parallax-mcp">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+  <p class="copy-status" role="status" aria-live="polite"></p>
+  <script src="app.js"></script>
+</body>
+</html>

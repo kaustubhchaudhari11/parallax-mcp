@@ -1,9 +1,18 @@
 # PARALLAX Research Protocol
 
+**Current status, 25 October 2026.** This file is the method. The
+sentence below, that no trials had been run, is the 21 October 2026
+status and is historical. Sanitized summaries now exist for protocol
+pilot `exp-3a-da9fc3022a77b55b`, Decision X-Ray
+`xray-547963e428ed516b`, and controls `ctl-3fcf26ebf34c7ce4`. The
+24-scenario exploratory evaluation described in this protocol has not
+been run. Measured rates are not rewritten into this file.
+
 **Status:** architecture review incorporated, 21 October 2026.
-No trials have been run. Sample sizes and token figures below are plans
-and ceilings, not measurements. The oracle contract is finalized for
-implementation. It is not a model output.
+No trials had been run when this status was written. Sample sizes and
+token figures below include the plan and its ceilings. Where a later
+study recorded a count, that count lives in the sanitized catalog.
+The oracle contract is the scoring rule. It is not a model output.
 
 ## Question
 

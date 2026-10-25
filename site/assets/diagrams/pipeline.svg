@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 920" fill="none" role="img">
+  <title>How PARALLAX compares two decisions</title>
+  <desc>An agent receives an MCP tool observation. A shared checkpoint splits into a factual branch and a modified-evidence branch. The decisions are compared and checked against the declared policy.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 1.2 L8 5 L0 8.8 Z" fill="#0F766E"/>
+    </marker>
+  </defs>
+  <style>
+    .node { fill: #FFFFFF; stroke: #E4E8E5; stroke-width: 1.5; }
+    .node-accent { fill: #FFFFFF; stroke: #0F766E; stroke-width: 1.75; }
+    .label { fill: #192B36; font: 600 22px "Segoe UI", Helvetica, sans-serif; }
+    .sub { fill: #596C76; font: 15px "Segoe UI", Helvetica, sans-serif; }
+    .line { stroke: #0F766E; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+  </style>
+  <rect class="node" x="145" y="16" width="270" height="72" rx="12"/>
+  <text class="label" x="280" y="58" text-anchor="middle">Agent</text>
+  <path class="line" d="M280 88 V112"/>
+  <rect class="node" x="115" y="120" width="330" height="72" rx="12"/>
+  <text class="label" x="280" y="162" text-anchor="middle">MCP observation</text>
+  <path class="line" d="M280 192 V216"/>
+  <rect class="node-accent" x="105" y="224" width="350" height="86" rx="12"/>
+  <text class="label" x="280" y="258" text-anchor="middle">Shared checkpoint</text>
+  <text class="sub" x="280" y="284" text-anchor="middle">Same prompt and settings</text>
+  <path class="line" d="M200 310 V348 H78 V372"/>
+  <path class="line" d="M360 310 V348 H482 V372"/>
+  <rect class="node-accent" x="16" y="380" width="220" height="88" rx="12"/>
+  <text class="label" x="126" y="416" text-anchor="middle">Factual branch</text>
+  <text class="sub" x="126" y="442" text-anchor="middle">Original evidence</text>
+  <rect class="node" x="324" y="380" width="220" height="88" rx="12" stroke="#0B5E63"/>
+  <text class="label" x="434" y="416" text-anchor="middle">Edited branch</text>
+  <text class="sub" x="434" y="442" text-anchor="middle">One declared change</text>
+  <path class="line" d="M126 468 V520 H280"/>
+  <path class="line" d="M434 468 V520 H280"/>
+  <path class="line" d="M280 520 V548"/>
+  <rect class="node" x="125" y="556" width="310" height="72" rx="12"/>
+  <text class="label" x="280" y="598" text-anchor="middle">Compare decisions</text>
+  <path class="line" d="M280 628 V656"/>
+  <rect class="node-accent" x="115" y="664" width="330" height="72" rx="12"/>
+  <text class="label" x="280" y="706" text-anchor="middle">Check the policy</text>
+  <path class="line" d="M280 736 V764"/>
+  <rect class="node" x="145" y="772" width="270" height="72" rx="12"/>
+  <text class="label" x="280" y="814" text-anchor="middle">Research report</text>
+</svg>
