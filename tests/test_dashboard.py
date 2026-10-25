@@ -410,7 +410,7 @@ def test_public_dashboard_loads_without_a_provider() -> None:
         check=False,
     )
     assert completed.returncode == 0, completed.stdout + "\n" + completed.stderr
-    assert "pages=5" in completed.stdout
+    assert "pages=6" in completed.stdout
     assert "provider_modules=absent" in completed.stdout
     assert "api_key=absent" in completed.stdout
 
@@ -555,10 +555,23 @@ for index, (page, marker, study_id) in enumerate(PAGES):
     assert "sk-" not in lowered, page
     assert "api_key" not in lowered, page
 
+_select(app, "byoa")
+app.run()
+_fail(app, "byoa")
+byoa = _text(app)
+assert "The public site does not execute an agent." in byoa
+assert "There is no Run Agent button." in byoa
+assert "controlled_fresh_rerun" in byoa
+assert "Do not upload secrets" in byoa
+button_labels = [button.label for button in app.button]
+assert all("run agent" not in label.lower() for label in button_labels)
+assert "langgraph" not in sys.modules
+assert "crewai" not in sys.modules
+
 assert _key_state("OPENAI_API_KEY") == "absent"
 loaded = [name for name in forbidden if name in sys.modules]
 assert not loaded, "provider modules loaded: " + ", ".join(loaded)
-print("pages=5")
+print("pages=6")
 print("provider_modules=absent")
 print("api_key=absent")
 """

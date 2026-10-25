@@ -4,6 +4,8 @@ from collections.abc import Sequence
 
 import streamlit as st
 
+from parallax.byoa.guide import COMMANDS, DOC_URL, GUIDE
+from parallax.byoa.report import ByoaReportError, read_report_bytes
 from parallax.dashboard.components import (
     architecture_flow,
     card_row,
@@ -51,6 +53,7 @@ PAGES = (
     ("reliability", "Reliability"),
     ("controls", "Research controls"),
     ("about", "About"),
+    ("byoa", "Test Your Agent"),
 )
 _HYPOTHESES = (
     ("h1_invariance", "H1 invariance"),
@@ -107,6 +110,8 @@ def render_page(page: str, bundle: ReleaseBundle, source: str, disclosure: Discl
         render_controls(bundle, source, disclosure)
     elif page == "about":
         render_about(bundle, source, disclosure)
+    elif page == "byoa":
+        render_byoa()
     else:
         render_overview(bundle, source, disclosure)
 
@@ -426,6 +431,55 @@ def render_about(bundle: ReleaseBundle, source: str, disclosure: Disclosure) -> 
     st.markdown(f"[PARALLAX on GitHub]({GITHUB_URL})")
     st.caption("The dashboard runs without an API key. It does not start a paid request.")
     _scope_lists(bundle, disclosure)
+
+
+def render_byoa() -> None:
+    """Explain local BYOA evaluation and display one validated report."""
+
+    hero(
+        "Test Your Agent",
+        "Bring a compatible agent.",
+        "Declare one evidence edit, run the framework locally, and read the contract verdict.",
+        tagline="The public site does not execute an agent.",
+    )
+    st.caption(
+        "Pilot, X-Ray, and control results are separate studies. "
+        "A BYOA report is one contract and one trial."
+    )
+    for title, body in GUIDE:
+        st.subheader(title)
+        st.markdown(body)
+    st.subheader("Commands")
+    for command in COMMANDS:
+        st.code(command, language="text")
+    st.markdown(f"[BYOA documentation]({DOC_URL})")
+    st.subheader("Report")
+    st.caption("Upload a JSON report from your own machine. Do not upload secrets or private transcripts.")
+    uploaded = st.file_uploader("BYOA report", type=["json"], key="byoa-report")
+    if uploaded is None:
+        return
+    try:
+        report = read_report_bytes(uploaded.getvalue())
+    except ByoaReportError as exc:
+        st.error(str(exc))
+        return
+    st.caption(f"{report.agent_framework} · {report.comparison_mode} · shared checkpoint {report.shared_checkpoint}")
+    card_row(
+        (
+            ("Verdict", report.verdict, report.expected_behavior, "measured"),
+            ("Factual", report.factual_decision or "missing", report.modified_field, "measured"),
+            (
+                "Counterfactual",
+                report.counterfactual_decision or "missing",
+                "one declared edit",
+                "measured",
+            ),
+        )
+    )
+    for item in report.limitations:
+        st.caption(item)
+    if report.errors:
+        st.warning(" ".join(report.errors))
 
 
 def _study_caption(study: ExperimentRelease) -> str:

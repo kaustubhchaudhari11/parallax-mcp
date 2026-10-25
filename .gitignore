@@ -20,6 +20,7 @@ credentials.json
 # Local experiment artifacts.
 # Traces can contain prompts, tool observations, and provider usage.
 runs/
+byoa-runs/
 traces/
 *.jsonl
 

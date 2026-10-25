@@ -29,3 +29,39 @@ jobs:
 
       - name: Run Ruff
         run: uv run --extra live --extra dashboard ruff check .
+
+  langgraph:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.2"
+          python-version: "3.12"
+
+      - name: Install the LangGraph extra
+        run: uv sync --frozen --all-groups --extra langgraph
+
+      - name: Run LangGraph adapter tests
+        run: uv run --extra langgraph pytest -q tests/test_byoa_contract.py tests/test_byoa_langgraph.py tests/test_byoa_cli.py
+
+  crewai:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv and Python 3.12
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.2"
+          python-version: "3.12"
+
+      - name: Install the CrewAI extra
+        run: uv sync --frozen --all-groups --extra crewai
+
+      - name: Run CrewAI adapter tests
+        run: uv run --extra crewai pytest -q tests/test_byoa_contract.py tests/test_byoa_crewai.py tests/test_byoa_cli.py

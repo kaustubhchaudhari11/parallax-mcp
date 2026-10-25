@@ -351,7 +351,19 @@ Novelty is not claimed.
 Streamlit and Plotly are the optional `dashboard` extra. They are not
 dependencies of the agent loop. Headroom is not a dependency.
 API keys belong in the environment, never in the repository.
-`.gitignore` excludes `.env`, `.venv`, and local `runs/`.
+`.gitignore` excludes `.env`, `.venv`, local `runs/`, and `byoa-runs/`.
+
+## Bring Your Own Agent
+
+A local LangGraph graph or CrewAI crew can be scored against a spec you
+write. The factory has to be a file inside this repository. The public
+dashboard explains the contract and can display a report. It does not
+run the agent. Install `langgraph` or `crewai` as separate extras. Do
+not install `crewai` together with `live`. The checked examples are
+scripted and do not call a provider.
+
+The contract, commands, and limits are in
+[`docs/BRING_YOUR_OWN_AGENT.md`](docs/BRING_YOUR_OWN_AGENT.md).
 
 ## Dashboard
 
