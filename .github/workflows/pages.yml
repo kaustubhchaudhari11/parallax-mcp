@@ -1,0 +1,185 @@
+# GitHub Pages for the static site in site/.
+#
+# Pull requests validate the site. They do not publish it.
+# Deployment runs only for a manual workflow_dispatch on main.
+#
+# Before the first deploy:
+#   Settings -> Pages -> Build and deployment -> Source: GitHub Actions
+#
+# Expected URL after a successful deploy, unverified until then:
+#   https://kaustubhchaudhari11.github.io/parallax-mcp/
+#
+# This workflow does not change repository visibility and does not
+# enable Pages by itself. The deploy step sets preview to false.
+
+name: GitHub Pages
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate the static site
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import struct
+
+          def workflow_configuration(text: str) -> str:
+              start = text.find("python3 - <<'PY'\n")
+              end = text.find("\n          PY\n", start)
+              if start < 0 or end < 0:
+                  raise SystemExit("could not separate the validation script from the workflow")
+              return text[:start] + text[end + len("\n          PY\n"):]
+
+          root = pathlib.Path("site")
+          required = [
+              "index.html",
+              "research.html",
+              "method.html",
+              "try.html",
+              "styles.css",
+              "app.js",
+              "assets/brand/mark.svg",
+              "assets/brand/favicon.svg",
+              "assets/brand/favicon.png",
+              "assets/diagrams/pipeline.svg",
+              "assets/social-preview.png",
+          ]
+          missing = [name for name in required if not (root / name).is_file()]
+          if missing:
+              raise SystemExit("missing site files: " + ", ".join(missing))
+
+          png = (root / "assets/social-preview.png").read_bytes()
+          if png[:8] != b"\x89PNG\r\n\x1a\n":
+              raise SystemExit("social preview is not a PNG")
+          width, height = struct.unpack(">II", png[16:24])
+          if (width, height) != (1200, 630):
+              raise SystemExit(f"social preview is {width}x{height}, expected 1200x630")
+
+          pages = [root / name for name in ("index.html", "research.html", "method.html", "try.html")]
+          html_pages = [(page.name, page.read_text(encoding="utf-8")) for page in pages]
+          html = "\n".join(text for _, text in html_pages)
+          css = (root / "styles.css").read_text(encoding="utf-8")
+          js = (root / "app.js").read_text(encoding="utf-8")
+          banned = ("OPENAI_API_KEY", "sk-", "api_key", "bearer ", ".env")
+          for name, text in html_pages:
+              body = text.split("</head>", 1)[-1]
+              for token in banned:
+                  if token in text:
+                      raise SystemExit(f"{name} contains {token}")
+              if re.search(r"""(?:href|src)\s*=\s*['"]/""", text):
+                  raise SystemExit(f"root-absolute asset path in {name}")
+              if 'rel="canonical"' in text or "rel='canonical'" in text:
+                  raise SystemExit(f"canonical URL is not verified yet ({name})")
+              if "https://kaustubhchaudhari11.github.io/parallax-mcp/" in body:
+                  raise SystemExit(f"unverified Pages URL is linked in the body of {name}")
+              if 'href="styles.css"' not in text or 'src="app.js"' not in text:
+                  raise SystemExit(f"{name} is missing the shared stylesheet or script")
+              for label in ("Home", "Research", "How It Works", "Try PARALLAX"):
+                  if label not in text:
+                      raise SystemExit(f"{name} is missing nav label {label}")
+          for token in banned:
+              for label, text in (("css", css), ("js", js)):
+                  if token in text:
+                      raise SystemExit(f"{label} contains {token}")
+          if re.search(r"""url\(\s*['"]/""", css):
+              raise SystemExit("root-absolute CSS url")
+          workflow_text = pathlib.Path(".github/workflows/pages.yml").read_text(encoding="utf-8")
+          # This script contains the text preview: true on purpose.
+          # A search of the whole file would match this source. The check
+          # below removes the script and reads the workflow configuration.
+          forbidden_preview = "preview: true"
+          if forbidden_preview not in workflow_text:
+              raise SystemExit("validator regression fixture was removed")
+          config = workflow_configuration(workflow_text)
+          if re.search(r"(?m)^[ ]*preview:[ ]*true[ ]*$", config):
+              raise SystemExit("workflow configuration sets preview to true")
+          if "actions/deploy-pages" in config.split("\n  deploy:", 1)[0]:
+              raise SystemExit("a job other than deploy publishes the site")
+          deploy = config.split("\n  deploy:", 1)[1]
+          manual_main = "if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'"
+          if manual_main not in deploy:
+              raise SystemExit("deployment is not limited to a manual run on main")
+          if "pull_request" in deploy:
+              raise SystemExit("deploy job can run for a pull request")
+          if not re.search(r"(?m)^[ ]*preview:[ ]*false[ ]*$", deploy):
+              raise SystemExit("deploy-pages preview is not false")
+          if re.search(r"(?m)^[ ]*push:", config.split("\njobs:", 1)[0]):
+              raise SystemExit("push is not a deployment trigger")
+          on_block = config.split("\njobs:", 1)[0]
+          if "workflow_dispatch:" not in on_block or "pull_request:" not in on_block:
+              raise SystemExit("workflow triggers are not pull_request validation plus manual dispatch")
+          required_text = [
+              "exp-3a-da9fc3022a77b55b",
+              "xray-547963e428ed516b",
+              "ctl-3fcf26ebf34c7ce4",
+              "15/15",
+              "5/5",
+              "0/5",
+              "0/3",
+              "3/3",
+              "INVESTIGATE",
+              "MONITOR",
+              "uv sync --all-groups",
+              "uv run pytest -q",
+              "uv run ruff check .",
+              "uv sync --extra dashboard",
+              "uv run --extra dashboard streamlit run streamlit_app.py",
+              "uv run --extra langgraph python -m parallax.byoa --framework langgraph --agent-factory examples/byoa/langgraph/agent.py:build_target --spec examples/byoa/langgraph/spec.json --dry-run",
+              "uv run --extra langgraph python -m parallax.byoa --framework langgraph --agent-factory examples/byoa/latency/agent.py:build_target --spec examples/byoa/latency/spec.json --dry-run",
+              "uv run --extra crewai python -m parallax.byoa --framework crewai --agent-factory examples/byoa/crewai/crew.py:build_target --spec examples/byoa/crewai/spec.json --dry-run",
+              "uv run --extra langgraph python -m parallax.byoa --framework langgraph --agent-factory examples/byoa/langgraph/agent.py:build_target --spec examples/byoa/langgraph/spec.json --live --output byoa-runs",
+              'href="styles.css"',
+              'src="app.js"',
+              "prefers-reduced-motion",
+          ]
+          combined = html + "\n" + css
+          absent = [item for item in required_text if item not in combined]
+          if absent:
+              raise SystemExit("missing required text:\n" + "\n".join(absent))
+          if "fetch(" in js or "XMLHttpRequest" in js:
+              raise SystemExit("site script must not call the network")
+          print("site validation passed")
+          PY
+
+  deploy:
+    needs: validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Upload the site directory
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+        with:
+          preview: false

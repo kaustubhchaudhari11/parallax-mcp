@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How It Works — PARALLAX</title>
+  <meta name="description" content="PARALLAX compares an agent's decisions under a controlled change to tool evidence.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#FAFAF7">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="PARALLAX">
+  <meta property="og:title" content="How PARALLAX tests a decision">
+  <meta property="og:description" content="Capture the tool observation, change one field, and compare the two decisions.">
+  <meta property="og:url" content="https://kaustubhchaudhari11.github.io/parallax-mcp/method.html">
+  <meta property="og:image" content="https://kaustubhchaudhari11.github.io/parallax-mcp/assets/social-preview.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="PARALLAX. One number changed. So did the agent's decision.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="How PARALLAX tests a decision">
+  <meta name="twitter:description" content="Capture the tool observation, change one field, and compare the two decisions.">
+  <meta name="twitter:image" content="https://kaustubhchaudhari11.github.io/parallax-mcp/assets/social-preview.png">
+  <meta name="twitter:image:alt" content="PARALLAX social card. 500 basis points stayed INVESTIGATE. 499 basis points became MONITOR.">
+  <link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="assets/brand/favicon.png" type="image/png" sizes="32x32">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="method">
+  <a class="skip" href="#content">Skip to content</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">
+      <img src="assets/brand/mark.svg" alt="" width="28" height="28">
+      PARALLAX
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="nav-links">Menu</button>
+    <nav class="nav-links" id="nav-links" aria-label="Primary">
+      <a href="index.html">Home</a>
+      <a href="research.html">Research</a>
+      <a href="method.html" aria-current="page">How It Works</a>
+      <a href="try.html">Try PARALLAX</a>
+    </nav>
+  </header>
+
+  <main id="content">
+    <div class="wrap page-intro">
+      <h1>How PARALLAX tests a decision</h1>
+      <p>PARALLAX compares two decisions after one controlled change to the tool evidence.</p>
+    </div>
+
+    <section class="section" aria-labelledby="diagram-title">
+      <div class="wrap pipeline">
+        <img src="assets/diagrams/pipeline.svg" alt="Diagram. An agent receives an MCP tool observation. A shared checkpoint splits into a factual branch with the original evidence and an edited branch with one declared change. The decisions are compared, checked against the policy, and written to a research report.">
+        <div>
+          <h2 id="diagram-title">Same starting point. One change.</h2>
+          <div class="prose">
+            <p><strong>Capture.</strong> Record the tool response the agent received.</p>
+            <p><strong>Fork.</strong> Keep the state this comparison can share.</p>
+            <p><strong>Change.</strong> Modify one validated field.</p>
+            <p><strong>Compare.</strong> Read the two decisions together.</p>
+            <p><strong>Evaluate.</strong> Check them against the rule declared for the experiment.</p>
+            <p>The correct label is applied after the decision exists. It is never placed in the prompt. A hosted model can still vary after the fork.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section band" id="agent-stack" aria-labelledby="stack-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="stack-title">Inside the agent stack</h2>
+          <p>Agents make decisions. Tools provide evidence. PARALLAX tests how those decisions respond when evidence changes.</p>
+        </div>
+        <div class="eco">
+          <p class="eco-goal">Same question. Three executions. They do not share a runtime.</p>
+          <div class="eco-paths">
+            <article class="eco-path">
+              <h3>Native MCP paired replay</h3>
+              <p class="eco-kicker">Research agent</p>
+              <ol class="eco-nodes">
+                <li>MCP tools return the observation</li>
+                <li>The harness captures that response</li>
+                <li>One validated edit</li>
+                <li>Both arms continue from the same prefix</li>
+              </ol>
+              <p class="eco-foot">The research oracle scores the decision after it exists. Decision X-Ray searches enumerated values on this path.</p>
+            </article>
+            <article class="eco-path">
+              <h3>LangGraph continuation</h3>
+              <p class="eco-kicker">Checkpoint</p>
+              <ol class="eco-nodes">
+                <li>The graph pauses before the decision</li>
+                <li>One shared checkpoint</li>
+                <li>Original resume, plus one edited fork</li>
+                <li>The spec's own expected labels</li>
+              </ol>
+              <p class="eco-foot">This re-runs the nodes after the pause. It does not show which tool a fresh run would have called earlier.</p>
+            </article>
+            <article class="eco-path">
+              <h3>CrewAI fresh rerun</h3>
+              <p class="eco-kicker">Two agents</p>
+              <ol class="eco-nodes">
+                <li>Metrics Analyst reads the tool</li>
+                <li>Incident Investigator chooses the label</li>
+                <li>Each arm builds a new crew</li>
+                <li>No shared checkpoint</li>
+              </ol>
+              <p class="eco-foot">The reference crew is this sequence of two agents. It is not a test of every crew shape.</p>
+            </article>
+          </div>
+          <div class="eco-harness">
+            <h3>PARALLAX harness</h3>
+            <p>Captures the evidence, validates the edit, runs the comparison that execution supports, and writes the report. BYOA connects a compatible agent that already lives in a trusted local checkout. You define the policy. This website does not run an uploaded agent.</p>
+          </div>
+          <div class="eco-notes">
+            <p class="fine">The provider-backed pilot and Decision X-Ray used the native research agent. The LangGraph and CrewAI examples are separate scripted local runs. Their labels are not the research oracle.</p>
+            <p class="fine">LangGraph here is a compiled graph with a checkpoint. It is not LangChain's higher-level agent API. A separate LangChain adapter is future work.</p>
+            <p class="fine">PARALLAX has not validated arbitrary multi-agent layouts, or instructions passing from one CrewAI agent to another.</p>
+          </div>
+        </div>
+        <div class="eco-cards">
+          <article class="eco-card">
+            <h3>MCP / Tool Evidence</h3>
+            <p>Structured tool observations give agents the information they use to decide.</p>
+          </article>
+          <article class="eco-card">
+            <h3>LangGraph</h3>
+            <p>Resume from a saved checkpoint and test how a changed observation affects the decision.</p>
+          </article>
+          <article class="eco-card">
+            <h3>CrewAI / Multi-Agent</h3>
+            <p>Run a fresh crew with modified evidence and compare the resulting decision.</p>
+          </article>
+          <article class="eco-card">
+            <h3>PARALLAX Harness</h3>
+            <p>Control what changes, record what happens, and evaluate the result against a defined policy.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="modes-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="modes-title">Three ways the comparison is made</h2>
+          <p>These are three different measurements.</p>
+        </div>
+        <div class="mode-grid">
+          <article class="mode">
+            <h3>Native paired replay</h3>
+            <p>The research engine copies one checkpoint into two arms. One arm keeps the captured observation. The other applies one validated edit.</p>
+          </article>
+          <article class="mode">
+            <h3>LangGraph continuation</h3>
+            <p>LangGraph resumes from a checkpoint. The graph pauses before the decision, and the adapter continues the original state and one edited fork.</p>
+          </article>
+          <article class="mode">
+            <h3>CrewAI fresh rerun</h3>
+            <p>CrewAI runs a fresh comparison. Each arm builds a new crew, and the two runs do not share a checkpoint.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="verdict-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="verdict-title">PASS, FAIL, and INCONCLUSIVE</h2>
+          <p>A local test uses your rules. A changed decision can still fail when you asked for a different label.</p>
+        </div>
+        <div class="verdicts">
+          <article class="card">
+            <h3 class="pass">PASS</h3>
+            <p>Both labels match the rules you declared, and the run checks passed.</p>
+          </article>
+          <article class="card">
+            <h3 class="fail">FAIL</h3>
+            <p>The run finished, and at least one label breaks a rule you declared.</p>
+          </article>
+          <article class="card">
+            <h3 class="inconclusive">INCONCLUSIVE</h3>
+            <p>The pair cannot be scored. A timeout, a missing label, or a dropped edit is not a pass.</p>
+          </article>
+        </div>
+        <details>
+          <summary>Policy used in the original studies</summary>
+          <p>The research rule has three predicates. M is an error rate of at least 500 basis points. L is at least 10 errors, or severity <code>error</code>. D is a deploy inside the window. MONITOR means none of them. ESCALATE means all three. INVESTIGATE means any proper subset. A boundary value belongs to the breach.</p>
+          <p>Reference LangGraph and CrewAI examples use a different rule: ESCALATE at or above 500, INVESTIGATE at or above 200, otherwise MONITOR. Their labels are not the research oracle.</p>
+        </details>
+        <details>
+          <summary>What a checkpoint does not answer</summary>
+          <p>A checkpoint shows what happened after this observation changed. It does not show whether a fresh run would have called a different tool before the branch. CrewAI does not use that checkpoint mechanism at all.</p>
+        </details>
+        <p class="more">Read the repository notes: <a href="https://github.com/kaustubhchaudhari11/parallax-mcp/blob/main/docs/ARCHITECTURE.md">architecture</a> and <a href="https://github.com/kaustubhchaudhari11/parallax-mcp/blob/main/docs/RESEARCH_PROTOCOL.md">research protocol</a>. <a href="try.html">Run a local example</a>.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-bar">
+      <div class="footer-brand">
+        <p class="footer-name">PARALLAX</p>
+        <p class="footer-tagline">Same agent. Different evidence. Different future.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="research.html">Research</a>
+        <a href="method.html">How It Works</a>
+        <a href="https://github.com/kaustubhchaudhari11/parallax-mcp">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+  <p class="copy-status" role="status" aria-live="polite"></p>
+  <script src="app.js"></script>
+</body>
+</html>
