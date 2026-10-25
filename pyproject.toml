@@ -24,6 +24,23 @@ dashboard = [
     "streamlit>=1.44",
     "plotly>=5.24",
 ]
+langgraph = [
+    "langgraph>=1.0",
+]
+crewai = [
+    "crewai>=0.86",
+]
+
+[tool.uv]
+# CrewAI's instructor dependency and the live OpenAI extra pin
+# incompatible jiter ranges. Installing both extras in one environment
+# is unsupported. The native runtime does not install either extra.
+conflicts = [
+    [
+        { extra = "live" },
+        { extra = "crewai" },
+    ],
+]
 
 [build-system]
 requires = ["uv_build>=0.13.2,<0.14.0"]
