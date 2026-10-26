@@ -1,11 +1,11 @@
 (function () {
   const moved = {
-    findings: "research.html#findings",
-    question: "research.html#question",
-    limits: "research.html#limits",
-    method: "method.html",
-    byoa: "try.html",
-    try: "try.html"
+    findings: "research/#findings",
+    question: "research/#question",
+    limits: "research/#limits",
+    method: "how-it-works/",
+    byoa: "try/",
+    try: "try/"
   };
   if (document.body.dataset.page === "home" && window.location.hash) {
     const id = window.location.hash.slice(1);

@@ -45,11 +45,42 @@ jobs:
               return text[:start] + text[end + len("\n          PY\n"):]
 
           root = pathlib.Path("site")
-          required = [
-              "index.html",
-              "research.html",
-              "method.html",
-              "try.html",
+          canonical = {
+              "index.html": {
+                  "css": 'href="styles.css"',
+                  "js": 'src="app.js"',
+                  "asset": "assets/",
+                  "og": "https://kaustubhchaudhari11.github.io/parallax-mcp/",
+                  "links": ('href="./"', 'href="research/', 'href="how-it-works/', 'href="try/'),
+              },
+              "research/index.html": {
+                  "css": 'href="../styles.css"',
+                  "js": 'src="../app.js"',
+                  "asset": "../assets/",
+                  "og": "https://kaustubhchaudhari11.github.io/parallax-mcp/research/",
+                  "links": ('href="../"', 'href="../research/', 'href="../how-it-works/', 'href="../try/'),
+              },
+              "how-it-works/index.html": {
+                  "css": 'href="../styles.css"',
+                  "js": 'src="../app.js"',
+                  "asset": "../assets/",
+                  "og": "https://kaustubhchaudhari11.github.io/parallax-mcp/how-it-works/",
+                  "links": ('href="../"', 'href="../research/', 'href="../how-it-works/', 'href="../try/'),
+              },
+              "try/index.html": {
+                  "css": 'href="../styles.css"',
+                  "js": 'src="../app.js"',
+                  "asset": "../assets/",
+                  "og": "https://kaustubhchaudhari11.github.io/parallax-mcp/try/",
+                  "links": ('href="../"', 'href="../research/', 'href="../how-it-works/', 'href="../try/'),
+              },
+          }
+          aliases = {
+              "research.html": "research/",
+              "method.html": "how-it-works/",
+              "try.html": "try/",
+          }
+          required = list(canonical) + list(aliases) + [
               "styles.css",
               "app.js",
               "assets/brand/mark.svg",
@@ -69,28 +100,73 @@ jobs:
           if (width, height) != (1200, 630):
               raise SystemExit(f"social preview is {width}x{height}, expected 1200x630")
 
-          pages = [root / name for name in ("index.html", "research.html", "method.html", "try.html")]
-          html_pages = [(page.name, page.read_text(encoding="utf-8")) for page in pages]
+          html_pages = [
+              (name, (root / name).read_text(encoding="utf-8")) for name in canonical
+          ]
           html = "\n".join(text for _, text in html_pages)
           css = (root / "styles.css").read_text(encoding="utf-8")
           js = (root / "app.js").read_text(encoding="utf-8")
           banned = ("OPENAI_API_KEY", "sk-", "api_key", "bearer ", ".env")
+          html_link = re.compile(r"""href\s*=\s*['"][^'"]*\.html""")
+          root_absolute = re.compile(r"""(?:href|src)\s*=\s*['"]/""")
           for name, text in html_pages:
+              spec = canonical[name]
               body = text.split("</head>", 1)[-1]
               for token in banned:
                   if token in text:
                       raise SystemExit(f"{name} contains {token}")
-              if re.search(r"""(?:href|src)\s*=\s*['"]/""", text):
+              if root_absolute.search(text):
                   raise SystemExit(f"root-absolute asset path in {name}")
+              if html_link.search(text):
+                  raise SystemExit(f"{name} still links to a .html URL")
               if 'rel="canonical"' in text or "rel='canonical'" in text:
                   raise SystemExit(f"canonical URL is not verified yet ({name})")
               if "https://kaustubhchaudhari11.github.io/parallax-mcp/" in body:
                   raise SystemExit(f"unverified Pages URL is linked in the body of {name}")
-              if 'href="styles.css"' not in text or 'src="app.js"' not in text:
+              if spec["css"] not in text or spec["js"] not in text:
                   raise SystemExit(f"{name} is missing the shared stylesheet or script")
+              if f'href="{spec["asset"]}' not in text and f'src="{spec["asset"]}' not in text:
+                  raise SystemExit(f"{name} is missing a relative asset path")
+              if spec["asset"] == "assets/":
+                  if "../styles.css" in text or "../app.js" in text or "../assets/" in text:
+                      raise SystemExit(f"{name} uses a nested asset path")
+              elif 'href="styles.css"' in text or 'src="app.js"' in text or 'href="assets/' in text or 'src="assets/' in text:
+                  raise SystemExit(f"{name} asset path is not relative to the nested page")
+              og = f'<meta property="og:url" content="{spec["og"]}">'
+              if og not in text:
+                  raise SystemExit(f"{name} has the wrong social page URL")
+              for link in spec["links"]:
+                  if link not in text:
+                      raise SystemExit(f"{name} is missing {link}")
               for label in ("Home", "Research", "How It Works", "Try PARALLAX"):
                   if label not in text:
                       raise SystemExit(f"{name} is missing nav label {label}")
+          research = (root / "research/index.html").read_text(encoding="utf-8")
+          for anchor in ('id="question"', 'id="xray"', 'id="findings"', 'id="limits"'):
+              if anchor not in research:
+                  raise SystemExit(f"research page is missing {anchor}")
+          if 'id="agent-stack"' not in (root / "how-it-works/index.html").read_text(encoding="utf-8"):
+              raise SystemExit("how-it-works page is missing #agent-stack")
+          for name, dest in aliases.items():
+              text = (root / name).read_text(encoding="utf-8")
+              redirect = (
+                  f'window.location.replace("{dest}" + window.location.search + window.location.hash);'
+              )
+              if redirect not in text or text.count("location.replace") != 1:
+                  raise SystemExit(f"{name} does not preserve the query and hash")
+              if f'href="{dest}"' not in text:
+                  raise SystemExit(f"{name} is missing a fallback link")
+              if root_absolute.search(text) or html_link.search(text):
+                  raise SystemExit(f"{name} redirect uses a root-absolute or .html target")
+              for token in banned:
+                  if token in text:
+                      raise SystemExit(f"{name} contains {token}")
+              body = text.split("</head>", 1)[-1]
+              if "https://kaustubhchaudhari11.github.io/parallax-mcp/" in body:
+                  raise SystemExit(f"unverified Pages URL is linked in the body of {name}")
+              destination = (root / dest / "index.html").read_text(encoding="utf-8")
+              if "location.replace" in destination:
+                  raise SystemExit(f"{dest} would loop with {name}")
           for token in banned:
               for label, text in (("css", css), ("js", js)):
                   if token in text:
@@ -150,6 +226,17 @@ jobs:
           absent = [item for item in required_text if item not in combined]
           if absent:
               raise SystemExit("missing required text:\n" + "\n".join(absent))
+          hash_map = [
+              'findings: "research/#findings"',
+              'question: "research/#question"',
+              'limits: "research/#limits"',
+              'method: "how-it-works/"',
+              'byoa: "try/"',
+              'try: "try/"',
+          ]
+          missing_map = [item for item in hash_map if item not in js]
+          if missing_map:
+              raise SystemExit("app.js hash map is missing:\n" + "\n".join(missing_map))
           if "fetch(" in js or "XMLHttpRequest" in js:
               raise SystemExit("site script must not call the network")
           print("site validation passed")

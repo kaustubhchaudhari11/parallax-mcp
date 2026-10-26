@@ -40,17 +40,26 @@ and this document does not repeat it as a working address.
 
 ### What the validator checks
 
-The pull-request job fails unless the four HTML pages, the stylesheet,
-the script, the brand assets, the pipeline diagram, and a 1200 by 630
-PNG social preview are present. It rejects root-absolute asset paths,
-a canonical link, the unverified Pages URL in the page body, and
-credential markers. The script must not call `fetch` or
-`XMLHttpRequest`. Navigation labels are Home, Research, How It Works,
-and Try PARALLAX.
+The pull-request job fails unless the four canonical pages are present:
+`site/index.html`, `site/research/index.html`,
+`site/how-it-works/index.html`, and `site/try/index.html`. It also
+requires `site/research.html`, `site/method.html`, and `site/try.html`.
+Those three files are client-side redirects to the directory routes.
+Each redirect keeps the query string and the hash fragment, and it uses
+`location.replace` so the old address does not stay in history. The
+stylesheet, the script, the brand assets, the pipeline diagram, and a
+1200 by 630 PNG social preview are required too. The check rejects
+root-absolute paths, a canonical link, the unverified Pages URL in the
+page body, `.html` in a canonical page link, and credential markers.
+The script must not call `fetch` or `XMLHttpRequest`. Navigation labels
+are Home, Research, How It Works, and Try PARALLAX.
 
-Asset references in the HTML are relative (`styles.css`, `app.js`,
-paths under `assets/`). That is required so the site works when the
-project is served from a repository subpath.
+The home page references `styles.css`, `app.js`, and `assets/` from
+`site/`. Nested pages use `../styles.css`, `../app.js`, and
+`../assets/`. Links between pages are relative directory paths such as
+`research/` and `../how-it-works/`, not root-absolute `/research/`
+paths. That is required because the project site is hosted under
+`/parallax-mcp/`.
 
 ### Smoke test without publishing
 
