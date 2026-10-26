@@ -107,9 +107,13 @@ The 24-scenario exploratory evaluation has not been run. A workshop manuscript i
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - Security: [`SECURITY.md`](SECURITY.md)
 
-## License and project links
+## License
 
-No license file is included yet. Do not treat the source as licensed for reuse until one is added. The recommendation is in [`docs/LICENSING.md`](docs/LICENSING.md).
+[Apache License 2.0](LICENSE) © 2026 Kaustubh Chaudhari.
+
+This license applies to PARALLAX's original materials to the extent the copyright holder has the rights to license them. Third-party dependencies and materials retain their own licenses; see [`docs/LICENSING.md`](docs/LICENSING.md).
+
+## Project links
 
 - Repository: <https://github.com/kaustubhchaudhari11/parallax-mcp>
 - Bring Your Own Agent: [`docs/BRING_YOUR_OWN_AGENT.md`](docs/BRING_YOUR_OWN_AGENT.md)
