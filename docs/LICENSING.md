@@ -1,66 +1,24 @@
-# Licensing decision
+# PARALLAX licensing
 
-**Status.** No license has been chosen. This file is a recommendation.
-It is not a grant. Do not add a `LICENSE` file, a `license` field in
-`pyproject.toml`, or a GitHub license badge until the owner accepts a
-license in writing.
+**Status:** The project owner has approved Apache License 2.0 for PARALLAX's original code and project materials that the copyright holder is authorized to license.
 
-Until that happens, the default position is that the copyright holder
-has not granted reuse rights. Readers can look at the repository.
-They cannot rely on a right to copy, modify, or ship it.
+- Official license: [../LICENSE](../LICENSE)
+- Project attribution: © 2026 Kaustubh Chaudhari
+- Package license identifier: `Apache-2.0`
 
-## Recommendation
+## What this covers
 
-Apache License, Version 2.0.
+The Apache-2.0 grant applies to original PARALLAX code, examples, documentation, website and research materials to the extent their rights are held by the licensor. It does **not** relicense third-party dependencies, upstream software, referenced academic papers, or separately licensed external content.
 
-Use it for this project if the owner wants an open-source research
-release that other labs and companies can run, modify, and
-redistribute, with an explicit patent grant from contributors and a
-requirement to keep notices intact.
+The library dependencies are declared in `pyproject.toml` and resolved in `uv.lock`. Installed dependencies retain their respective licenses. Copying or redistributing third-party materials can require preserving notices or other conditions.
 
-Why this license rather than a shorter permissive text:
+## Release verification
 
-- The code is research software that may sit next to papers and
-  industrial prototypes. Apache-2.0 is widely used for that mix and is
-  understood by university technology-transfer offices.
-- The patent grant matters more here than it does for a small script.
-  An evaluation harness can be reimplemented, and the grant reduces
-  ambiguity about contributor patent claims.
-- The notice and change-tracking requirements are light, and they fit
-  a repository that already keeps a changelog and a manuscript.
-- Dependencies used by the core install, including the MCP Python SDK
-  and Pydantic, are themselves under permissive licenses. Apache-2.0
-  does not force those dependencies onto a different license, and it
-  does not require PARALLAX to be copyleft.
+Before making the repository public or distributing package artifacts:
 
-MIT is a reasonable alternative if the owner wants the shortest
-permissive grant and does not want the patent and notice machinery.
-GPL-3.0 is a poor fit if the goal is a library that closed downstream
-tools can call. No license was selected between these options.
+1. Verify license and attribution obligations for the exact dependency versions used by each supported installation environment.
+2. Review the provenance and permitted redistribution of website assets, manuscript diagrams, and any included third-party code.
+3. Confirm the wheel and source distribution include the full Apache-2.0 `LICENSE` and no credentials, raw traces or private run data.
+4. Verify license metadata, tests, CI and public repository readiness.
 
-CC BY 4.0 is appropriate for the manuscript if the owner wants a
-documentation license that is separate from the code. It is not a
-software license and should not be the only grant on `src/`.
-
-## What stays blocked
-
-Until a `LICENSE` file is added and the package metadata names it:
-
-- PyPI publication should wait. Uploading states a license.
-- Downstream packagers should not redistribute the code.
-- The README must keep saying that reuse is not granted. It does.
-- The GitHub license detector will report no license. That is accurate.
-- Figures in `paper/figures/` and the manuscript travel with the code.
-  They are not separately licensed.
-- Third-party snippets are not an issue in the current tree. The
-  manuscript quotes short method phrases from this repository. It does
-  not copy papers.
-
-Accepting Apache-2.0 later is a one-file addition plus the `license`
-field. It does not require rewriting history. It should be its own
-commit, made by the owner, not folded silently into a feature change.
-
-## Owner action
-
-Reply with the license name to use. The recommended text is Apache-2.0.
-No `LICENSE` file will be added without that reply.
+No claim is made that every transitive package has been legally certified merely because PARALLAX uses Apache-2.0. See the [official Apache-2.0 license](https://www.apache.org/licenses/LICENSE-2.0) for its terms, including its notice, change-tracking, patent and warranty provisions.
