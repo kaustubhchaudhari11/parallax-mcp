@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="pairTitle pairDesc">
+  <title id="pairTitle">Paired continuation from one checkpoint</title>
+  <desc id="pairDesc">A fixed prompt and fixture reach a tool request. The checkpoint is the transcript before that result is appended. Two copies continue: one with the captured observation and one with a schema-checked edit. Decisions are compared with an oracle that was not shown to the agent.</desc>
+  <style>
+    .bg { fill: #F7F4EE; }
+    .box { fill: #FFFFFF; stroke: #1C2834; stroke-width: 1.4; }
+    .held { fill: #EEF3F2; stroke: #0F6E6B; stroke-width: 1.5; }
+    .fact { fill: #F3F7F6; stroke: #0F6E6B; stroke-width: 1.6; }
+    .alt { fill: #FBF6EF; stroke: #8C4A12; stroke-width: 1.6; }
+    .label { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #1C2834; font-size: 15px; font-weight: 650; }
+    .sub { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #3E4C59; font-size: 12.5px; }
+    .small { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #3E4C59; font-size: 12px; }
+    .arrow { stroke: #1C2834; stroke-width: 1.4; fill: none; marker-end: url(#pairArrow); }
+  </style>
+  <defs>
+    <marker id="pairArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#1C2834"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="960" height="520"/>
+  <text class="label" x="36" y="38">Held fixed</text>
+  <rect class="held" x="36" y="52" width="888" height="64" rx="6"/>
+  <text class="sub" x="52" y="78">Prompt text and hash, model id, recorded parameters, fixture hash, tool allowlist, budgets.</text>
+  <text class="sub" x="52" y="98">The oracle decision is not in this prefix.</text>
+
+  <rect class="box" x="36" y="146" width="250" height="86" rx="6"/>
+  <text class="label" x="52" y="178">Tool request</text>
+  <text class="sub" x="52" y="202">named by the scenario</text>
+
+  <rect class="box" x="356" y="146" width="280" height="86" rx="6"/>
+  <text class="label" x="372" y="178">Checkpoint</text>
+  <text class="sub" x="372" y="202">before the result is appended</text>
+
+  <rect class="box" x="706" y="146" width="218" height="86" rx="6"/>
+  <text class="label" x="722" y="178">Prefix check</text>
+  <text class="sub" x="722" y="202">equal prefix hashes</text>
+
+  <path class="arrow" d="M286 189 H356"/>
+  <path class="arrow" d="M636 189 H706"/>
+
+  <rect class="fact" x="96" y="292" width="320" height="110" rx="6"/>
+  <text class="label" x="112" y="324">Factual arm</text>
+  <text class="sub" x="112" y="348">append the captured observation</text>
+  <text class="sub" x="112" y="368">continue under the same budget</text>
+  <text class="sub" x="112" y="388">read the decision</text>
+
+  <rect class="alt" x="544" y="292" width="320" height="110" rx="6"/>
+  <text class="label" x="560" y="324">Counterfactual arm</text>
+  <text class="sub" x="560" y="348">append one schema-checked edit</text>
+  <text class="sub" x="560" y="368">same prefix, same budget</text>
+  <text class="sub" x="560" y="388">read the decision</text>
+
+  <path class="arrow" d="M780 232 V262 H256 V292"/>
+  <path class="arrow" d="M850 232 V262 H704 V292"/>
+
+  <text class="small" x="36" y="444">Comparison, after both arms return</text>
+  <rect class="box" x="36" y="456" width="888" height="42" rx="6"/>
+  <text class="sub" x="52" y="482">Score each decision against the arm's facts. Keep parse failures in the denominator. Do not drop a pair because the arms disagree.</text>
+</svg>

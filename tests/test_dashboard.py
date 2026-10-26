@@ -11,6 +11,7 @@ import pytest
 
 from parallax.dashboard.data import (
     ARCHITECTURE_PATH,
+    NOT_IMPLEMENTED,
     SECRET_MARKERS,
     DashboardLoadError,
     OmittedRun,
@@ -144,6 +145,14 @@ def test_boundary_hashes_match_the_recorded_xray_evidence() -> None:
     assert rows[501].measured_status == "no_flip"
     assert all(row.hash_matches_record for row in rows.values())
     assert rows[499].sha256 == rows[499].recorded_sha256
+
+
+def test_public_scope_does_not_deny_implemented_adapters() -> None:
+    bundle = load_bundled()
+    text = " ".join(bundle.not_implemented)
+    assert "LangGraph and CrewAI adapters" not in text
+    assert "Provider-backed reliability measurements for LangGraph or CrewAI agents" in text
+    assert tuple(bundle.not_implemented) == NOT_IMPLEMENTED
 
 
 def test_bundled_release_has_no_secrets_or_provider_ids() -> None:

@@ -30,6 +30,9 @@ jobs:
       - name: Run Ruff
         run: uv run --extra live --extra dashboard ruff check .
 
+      - name: Build the package
+        run: uv build
+
   langgraph:
     runs-on: ubuntu-latest
     steps:

@@ -5,6 +5,14 @@
 PARALLAX measurements, and it does not claim novelty. Figures below
 are the cited authors' results.
 
+**Update, 25 October 2026.** The repository now contains the MCP path,
+paired replay, exact payload retention, and an oracle that stays out of
+the prompt. A protocol pilot, one X-Ray search, and one control study
+are recorded in [`RESULTS.md`](RESULTS.md) and discussed in
+[`../paper/parallax-paper.md`](../paper/parallax-paper.md). Those
+records are small. They are not a novelty proof. The comparison below
+remains a design comparison.
+
 **Status:** 21 October 2026.
 This review records sources that were opened and what they support.
 It does not claim that PARALLAX is novel. Several systems already replay
@@ -199,9 +207,10 @@ itself against.
 | ToolEmu | Where do tool agents create high-stakes failures? | Scenarios, with tools emulated by a model | LM evaluator, checked in part by humans |
 | de Zarzà et al. | Do reasoning agents stay stable under reworded problems? | The user problem, preserving its meaning | Agreement across transformations |
 | Causal Agent Replay | Which step caused a bad outcome? | An action, an observation, context, or the policy, then replay | Shift in an outcome distribution |
-| PARALLAX (planned) | Does this agent apply a stated incident policy under a declared MCP observation edit? | One schema-checked tool result, after a real MCP call, from a frozen prefix | Deterministic oracle on fixture facts; labels stay out of the prompt |
+| PARALLAX | Does this agent apply a stated incident policy under a declared MCP observation edit? | One schema-checked tool result, after a real MCP call, from a frozen prefix | Deterministic oracle on fixture facts; labels stay out of the prompt |
 
-The combination PARALLAX is aiming at, and has not yet demonstrated:
+The combination named on 21 October 2026, which the software now
+implements and which the recorded studies only begin to exercise:
 
 - a real MCP client and server, not an in-prompt fake of a tool
 - deterministic fixtures, so the observation is not an LM sample

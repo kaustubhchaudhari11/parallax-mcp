@@ -143,4 +143,4 @@ A developer policy is the spec's `expected_behavior`, with `equals` or `one_of` 
 
 A report reader uses `ByoaReport` or the experiment summary models. Displaying a file does not add an execution path.
 
-Developer instructions are in `docs/BRING_YOUR_OWN_AGENT.md`. The method for the recorded studies is in `docs/RESEARCH_PROTOCOL.md`.
+Developer instructions are in `docs/BRING_YOUR_OWN_AGENT.md`. The method for the recorded studies is in `docs/RESEARCH_PROTOCOL.md`. The sanitized figures are in `docs/RESULTS.md`. The workshop manuscript is in `paper/parallax-paper.md`. Install and dry-run commands are in `docs/REPRODUCIBILITY.md`.
