@@ -1152,6 +1152,119 @@ details ul:last-child {
   }
 }
 
+.field-change {
+  margin: 0.9rem 0 0.35rem;
+  padding: 0.85rem 0.95rem 0.35rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.field-kicker {
+  margin: 0 0 0.2rem;
+  color: var(--teal-dark);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field-name {
+  margin: 0;
+}
+
+.field-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0.55rem 0 0.15rem;
+}
+
+.field-pair div {
+  min-width: 0;
+}
+
+.field-pair dt {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field-pair dd {
+  margin: 0.12rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.7rem;
+  line-height: 1.15;
+}
+
+.field-flag {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.12rem 0.45rem;
+  border: 1px solid #c9e4df;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal-dark);
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  vertical-align: 0.28rem;
+}
+
+.field-flag.is-same {
+  border-color: var(--line);
+  background: var(--card);
+  color: var(--muted);
+}
+
+.obs-json {
+  margin-top: 0.35rem;
+  border-top: 0;
+  padding-top: 0.15rem;
+}
+
+.obs-json h3 {
+  margin: 0.85rem 0 0;
+  font-family: var(--sans);
+  font-size: 0.95rem;
+}
+
+.obs-json pre {
+  overflow-x: auto;
+  margin-top: 0.45rem;
+  padding: 0.75rem 0.85rem;
+  background: #f2f5f3;
+  color: #23343d;
+  border: 1px solid #dfe5e1;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-size: clamp(13px, 0.82rem, 14px);
+  font-weight: 400;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.study-ids {
+  margin-top: 0.35rem;
+}
+
+.limits-note {
+  margin-top: 1.15rem;
+}
+
+@media (max-width: 760px) {
+  .field-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
