@@ -29,6 +29,8 @@ traces/
 !.streamlit/config.toml
 
 # OS and editor
+# Local AI editor instructions are intentionally not published.
+.cursor/
 .DS_Store
 Thumbs.db
 *.swp
