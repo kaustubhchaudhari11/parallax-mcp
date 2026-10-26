@@ -81,7 +81,7 @@ uv run --extra dashboard streamlit run streamlit_app.py
 
 ## How to reproduce
 
-The method, pairing rules, and limits are in [`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md). Python 3.12, `uv.lock`, and MCP Python SDK 2.3.0 are part of that record. Prompt, fixture, and intervention hashes are stored with each study.
+The install path, dry-runs, and budgets are in [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md). The method and pairing rules are in [`docs/RESEARCH_PROTOCOL.md`](docs/RESEARCH_PROTOCOL.md). Recorded counts are in [`docs/RESULTS.md`](docs/RESULTS.md). Python 3.12, `uv.lock`, and MCP Python SDK 2.3.0 are part of that record. Prompt, fixture, and intervention hashes are stored with each study.
 
 `python -m parallax.experiment --protocol-pilot --dry-run` prints the frozen manifest and does not call a provider. A live rerun is a separate `--live` step. It needs the `live` extra and a provider key outside the repository. The default tests do not take that step. Raw traces stay in gitignored `runs/`. The catalog is the sanitized summary.
 
@@ -95,11 +95,21 @@ The published demo uses a small synthetic incident dataset and one live model co
 
 LangGraph resumes from a checkpoint. CrewAI uses a controlled fresh rerun. The website does not execute an uploaded agent. These studies do not guarantee reliability for every agent.
 
-The 24-scenario exploratory evaluation has not been run. A paper is not published.
+The 24-scenario exploratory evaluation has not been run. A workshop manuscript is in [`paper/parallax-paper.md`](paper/parallax-paper.md). It is not published in a venue and it has no DOI.
+
+## Release documents
+
+- Manuscript: [`paper/parallax-paper.md`](paper/parallax-paper.md)
+- Recorded results: [`docs/RESULTS.md`](docs/RESULTS.md)
+- Reproducibility: [`docs/REPRODUCIBILITY.md`](docs/REPRODUCIBILITY.md)
+- Deployment: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+- Release notes: [`docs/RELEASE_NOTES_v0.1.0.md`](docs/RELEASE_NOTES_v0.1.0.md)
+- Changelog: [`CHANGELOG.md`](CHANGELOG.md)
+- Security: [`SECURITY.md`](SECURITY.md)
 
 ## License and project links
 
-No license file is included yet. Do not treat the source as licensed for reuse until one is added.
+No license file is included yet. Do not treat the source as licensed for reuse until one is added. The recommendation is in [`docs/LICENSING.md`](docs/LICENSING.md).
 
 - Repository: <https://github.com/kaustubhchaudhari11/parallax-mcp>
 - Bring Your Own Agent: [`docs/BRING_YOUR_OWN_AGENT.md`](docs/BRING_YOUR_OWN_AGENT.md)

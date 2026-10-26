@@ -6,7 +6,8 @@ status and is historical. Sanitized summaries now exist for protocol
 pilot `exp-3a-da9fc3022a77b55b`, Decision X-Ray
 `xray-547963e428ed516b`, and controls `ctl-3fcf26ebf34c7ce4`. The
 24-scenario exploratory evaluation described in this protocol has not
-been run. Measured rates are not rewritten into this file.
+been run. Measured rates are not rewritten into this file. The sanitized
+figures are in [`RESULTS.md`](RESULTS.md).
 
 **Status:** architecture review incorporated, 21 October 2026.
 No trials had been run when this status was written. Sample sizes and

@@ -1744,7 +1744,7 @@
   "not_implemented": [
     "Exploratory evaluation of the 24 declared scenarios",
     "A second model or a multi-model comparison",
-    "LangGraph and CrewAI adapters",
+    "Provider-backed reliability measurements for LangGraph or CrewAI agents",
     "Headroom on the measurement path",
     "Starting a model run from the dashboard",
     "A paid or hosted execution endpoint"

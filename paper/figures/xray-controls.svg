@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="xrayTitle xrayDesc">
+  <title id="xrayTitle">Enumerated boundary search and shared-checkpoint controls</title>
+  <desc id="xrayDesc">On fixture F100, one checkpoint at 500 basis points returned INVESTIGATE. The enumerated candidates were 499, which returned MONITOR, and 501, which returned INVESTIGATE. A separate control study repeated null, intervention, and negative continuations from one checkpoint draw: 0 of 3, 3 of 3, and 0 of 3 flips.</desc>
+  <style>
+    .bg { fill: #F7F4EE; }
+    .box { fill: #FFFFFF; stroke: #1C2834; stroke-width: 1.4; }
+    .base { fill: #EEF3F2; stroke: #0F6E6B; stroke-width: 1.6; }
+    .flip { fill: #FBF6EF; stroke: #8C4A12; stroke-width: 1.6; }
+    .stay { fill: #F3F7F6; stroke: #0F6E6B; stroke-width: 1.6; }
+    .label { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #1C2834; font-size: 15px; font-weight: 650; }
+    .sub { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #3E4C59; font-size: 12.5px; }
+    .num { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #1C2834; font-size: 22px; font-weight: 700; }
+    .arrow { stroke: #1C2834; stroke-width: 1.4; fill: none; marker-end: url(#xArrow); }
+  </style>
+  <defs>
+    <marker id="xArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#1C2834"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="960" height="540"/>
+  <text class="label" x="36" y="36">Decision X-Ray, enumerated set only</text>
+  <text class="sub" x="36" y="58">Study xray-547963e428ed516b. Fixture F100. Field error_rate_bps. Candidates 499 and 501.</text>
+
+  <rect class="base" x="330" y="78" width="300" height="88" rx="6"/>
+  <text class="num" x="346" y="114">500</text>
+  <text class="sub" x="430" y="110">basis points</text>
+  <text class="sub" x="346" y="142">recorded decision INVESTIGATE</text>
+
+  <rect class="flip" x="70" y="220" width="300" height="100" rx="6"/>
+  <text class="num" x="86" y="258">499</text>
+  <text class="sub" x="166" y="254">distance 1</text>
+  <text class="sub" x="86" y="286">MONITOR, verified flip</text>
+  <text class="sub" x="86" y="306">one post-fork draw</text>
+
+  <rect class="stay" x="590" y="220" width="300" height="100" rx="6"/>
+  <text class="num" x="606" y="258">501</text>
+  <text class="sub" x="686" y="254">distance 1</text>
+  <text class="sub" x="606" y="286">INVESTIGATE, no flip</text>
+  <text class="sub" x="606" y="306">one post-fork draw</text>
+
+  <path class="arrow" d="M400 166 V196 H220 V220"/>
+  <path class="arrow" d="M560 166 V196 H740 V220"/>
+
+  <text class="label" x="36" y="368">Controls from one checkpoint draw</text>
+  <text class="sub" x="36" y="390">Study ctl-3fcf26ebf34c7ce4. Three fresh continuations per arm. Not three independent checkpoints.</text>
+
+  <rect class="stay" x="36" y="410" width="280" height="92" rx="6"/>
+  <text class="label" x="52" y="440">Null, 500</text>
+  <text class="num" x="52" y="476">0/3 flips</text>
+
+  <rect class="flip" x="340" y="410" width="280" height="92" rx="6"/>
+  <text class="label" x="356" y="440">Intervention, 499</text>
+  <text class="num" x="356" y="476">3/3 flips</text>
+
+  <rect class="stay" x="644" y="410" width="280" height="92" rx="6"/>
+  <text class="label" x="660" y="440">Negative, 501</text>
+  <text class="num" x="660" y="476">0/3 flips</text>
+</svg>

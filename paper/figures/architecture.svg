@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 620" role="img" aria-labelledby="archTitle archDesc">
+  <title id="archTitle">PARALLAX native evaluation path</title>
+  <desc id="archDesc">Synthetic fixtures pass through an MCP server and one agent loop. One captured observation is validated, then continued as a factual arm and a counterfactual arm. The oracle scores both decisions afterward. A sanitized summary is shown by a read-only dashboard and a static site. Bring Your Own Agent is a separate local path.</desc>
+  <style>
+    .bg { fill: #F7F4EE; }
+    .box { fill: #FFFFFF; stroke: #1C2834; stroke-width: 1.4; }
+    .fork { fill: #F3F7F6; stroke: #0F6E6B; stroke-width: 1.6; }
+    .alt { fill: #FBF6EF; stroke: #8C4A12; stroke-width: 1.6; }
+    .quiet { fill: #EEF1F4; stroke: #1C2834; stroke-width: 1.2; }
+    .label { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #1C2834; font-size: 15px; font-weight: 650; }
+    .sub { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #3E4C59; font-size: 12px; }
+    .arrow { stroke: #1C2834; stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+    .note { font-family: "Segoe UI", "Source Sans 3", sans-serif; fill: #3E4C59; font-size: 13px; }
+  </style>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1.2 L 9 5 L 0 8.8 z" fill="#1C2834"/>
+    </marker>
+  </defs>
+  <rect class="bg" x="0" y="0" width="960" height="620"/>
+  <text class="label" x="36" y="36">Native path</text>
+  <text class="sub" x="140" y="36">one observation changes; the prefix does not</text>
+
+  <rect class="box" x="36" y="58" width="200" height="78" rx="6"/>
+  <text class="label" x="52" y="88">Synthetic fixtures</text>
+  <text class="sub" x="52" y="110">F000F111, immutable</text>
+
+  <rect class="box" x="286" y="58" width="210" height="78" rx="6"/>
+  <text class="label" x="302" y="88">MCP server</text>
+  <text class="sub" x="302" y="110">get_metrics, get_logs,</text>
+  <text class="sub" x="302" y="126">get_deployment</text>
+
+  <rect class="box" x="546" y="58" width="180" height="78" rx="6"/>
+  <text class="label" x="562" y="88">Agent loop</text>
+  <text class="sub" x="562" y="110">prompt has no label</text>
+
+  <rect class="box" x="756" y="58" width="168" height="78" rx="6"/>
+  <text class="label" x="772" y="88">Capture</text>
+  <text class="sub" x="772" y="110">canonical JSON</text>
+
+  <path class="arrow" d="M236 97 H286"/>
+  <path class="arrow" d="M496 97 H546"/>
+  <path class="arrow" d="M726 97 H756"/>
+
+  <rect class="box" x="286" y="188" width="390" height="72" rx="6"/>
+  <text class="label" x="302" y="216">Pre-fork checkpoint</text>
+  <text class="sub" x="302" y="238">transcript copied before the edited result is appended</text>
+  <path class="arrow" d="M840 136 V168 H481 V188"/>
+
+  <rect class="fork" x="96" y="312" width="300" height="92" rx="6"/>
+  <text class="label" x="112" y="344">Factual continuation</text>
+  <text class="sub" x="112" y="366">captured observation</text>
+  <text class="sub" x="112" y="384">schema-valid, unchanged facts</text>
+
+  <rect class="alt" x="564" y="312" width="300" height="92" rx="6"/>
+  <text class="label" x="580" y="344">Counterfactual continuation</text>
+  <text class="sub" x="580" y="366">one validated edit</text>
+  <text class="sub" x="580" y="384">H1, H2, or H3 family</text>
+
+  <path class="arrow" d="M400 260 V286 H246 V312"/>
+  <path class="arrow" d="M560 260 V286 H714 V312"/>
+
+  <rect class="box" x="286" y="448" width="390" height="72" rx="6"/>
+  <text class="label" x="302" y="476">Oracle, after both decisions</text>
+  <text class="sub" x="302" y="498">reads fixture facts, never the prompt</text>
+  <path class="arrow" d="M246 404 V430 H400 V448"/>
+  <path class="arrow" d="M714 404 V430 H560 V448"/>
+
+  <rect class="quiet" x="36" y="548" width="888" height="52" rx="6"/>
+  <text class="note" x="52" y="570">Sanitized summary only. The dashboard and the static site do not call a model.</text>
+  <text class="note" x="52" y="588">Bring Your Own Agent is separate: a local LangGraph checkpoint resume, or a CrewAI fresh rerun. It does not use this oracle.</text>
+</svg>
